@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bıkmaz Grup Lobi Ekranı</title>
+  <meta name="description" content="Dijital Ziyaretçi Karşılama Lobi Ekranı" />
+  <link rel="icon" type="image/png" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/favicon.ico" />
+  <link rel="stylesheet" href="/fonts/noto-sans.css" />
+  
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+
+  <div class="bg-layer"></div>
+  <div class="bg-media-layer" id="bg-media"></div>
+  <div class="bg-overlay" id="bg-overlay"></div>
+  <div class="particles" id="particles"></div>
+
+  <div id="app-shell">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="logo-area">
+      <img id="company-logo-img" class="company-logo-img" alt="Company Logo" />
+      <div class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+          <rect x="2" y="2" width="10" height="10" rx="2" fill="white" opacity="0.9" />
+          <rect x="16" y="2" width="10" height="10" rx="2" fill="white" opacity="0.6" />
+          <rect x="2" y="16" width="10" height="10" rx="2" fill="white" opacity="0.6" />
+          <rect x="16" y="16" width="10" height="10" rx="2" fill="white" opacity="0.9" />
+        </svg>
+      </div>
+    </div>
+    <div class="conn-status">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-label">Bağlanıyor...</span>
+    </div>
+    <div class="clock-area">
+      <div class="clock-time" id="clock-time">00:00:00</div>
+      <div class="clock-date" id="clock-date"></div>
+    </div>
+  </header>
+
+  <!-- ANA İÇERİK -->
+  <main class="main lobi-main">
+
+    <!-- İçerik Ekranı (video / görsel) -->
+    <div id="content-screen">
+      <div id="content-media"></div>
+      <div class="content-overlay">
+        <div class="content-title" id="content-title"></div>
+      </div>
+    </div>
+
+    <!-- Hoş Geldiniz Ekranı (ziyaretçi varken) -->
+    <div id="welcome-screen" class="screen-transition screen-hide">
+      <div class="welcome-label">HOŞ GELDİNİZ</div>
+      <div class="welcome-name" id="welcome-name">—</div>
+      <div class="welcome-divider"></div>
+      <div class="host-label">Görüşeceğiniz Kişi</div>
+      <div class="welcome-host" id="welcome-host">—</div>
+      <div class="host-label" style="margin-top:12px">Görüşeceğiniz Kişinin Şirketi</div>
+      <div class="welcome-host-company" id="welcome-host-company">—</div>
+    </div>
+
+    <!-- Default Ekran (ziyaretçi yokken) -->
+    <div id="default-screen" class="screen-transition with-bg" style="background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);padding:50px 100px;border-radius:48px;border:1px solid rgba(255,255,255,0.6);box-shadow:0 40px 100px rgba(0,0,0,0.15);width:fit-content;max-width:90vw;min-width:min(650px,92vw);margin:auto;">
+      <div class="default-title">Hoş <span>Geldiniz</span></div>
+      <div class="default-sub">Lütfen resepsiyona başvurunuz</div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER ticker -->
+  <footer class="lobi-footer">
+    <span>📡 Bıkmazdesk</span>
+    <div class="lobi-ticker">
+      <div class="ticker-inner" id="ticker">
+        <span class="ticker-item">👋 Ziyaretiniz için teşekkür ederiz</span>
+        <span class="ticker-item">📋 Lütfen resepsiyona başvurunuz</span>
+        <span class="ticker-item">🔔 Randevunuz için sekreterya ile iletişime geçin</span>
+        <span class="ticker-item">☕ Bekleme alanımızda ikramlıklar mevcuttur</span>
+        <span class="ticker-item">📶 WiFi: Bikmazdesk_Guest | Şifre: Hosgeldiniz</span>
+      </div>
+    </div>
+    <span id="footer-date"></span>
+  </footer>
+
+  </div>
+
+  <button class="rotate-btn" id="rotate-btn" onclick="toggleManualRotate()" title="Ekranı Elle Döndür">↻</button>
+
+  <!-- Fullscreen butonu -->
+  <button class="fs-btn" onclick="toggleFullscreen()" title="Tam Ekran">⛶</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/panels/lobby-screen.js"></script>
+</body>
+
+</html>

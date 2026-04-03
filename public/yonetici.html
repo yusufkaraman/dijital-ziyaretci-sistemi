@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="/fonts/noto-sans.css"/>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+  <a class="logo" href="/yonetici">
+    <div class="logo-icon" style="background:transparent; box-shadow:none;">
+      <img id="manager-logo-img" src="/Assets/sitelogo.png" style="width:100%; height:100%; object-fit:contain;" alt="BIKMAZ GRUP Logo" />
+    </div>
+    <div>
+      <div class="logo-title">BIKMAZ GRUP</div>
+      <div class="logo-sub">Yönetici Kontrol Merkezi</div>
+    </div>
+  </a>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-primary" onclick="openAddVisitorModal()">+ Yeni Giriş Kaydı veya Randevu Oluştur</button>
+    <button class="btn-secondary" style="height:36px; padding:0 16px; font-size:13px;" onclick="showChangePasswordModal()">Şifre Değiştir</button>
+    <div class="live-indicator"><div class="live-dot"></div><span>Canlı</span></div>
+    <div class="top-clock" id="top-clock"></div>
+    <button class="btn-icon" onclick="toggleNotifications()" title="Bildirimler" style="width:36px; height:36px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> <span id="notif-count" style="background:var(--red);color:#fff;padding:1px 6px;border-radius: var(--radius);font-size:10px;display:none">0</span>
+    </button>
+    <div class="user-chip" onclick="logout()">
+      <div class="av" id="user-av">?</div>
+      <div>
+        <div style="font-size:13px;font-weight:600" id="user-name">Yükleniyor</div>
+        <div style="font-size:11px;color:var(--muted)">Çıkış için tıkla</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-card">
+    <div class="notif-header">
+      <span>🔔 Bildirimler</span>
+      <button onclick="clearNotifs()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:'Noto Sans','Helvetica Neue',Arial,sans-serif">Temizle</button>
+    </div>
+    <div id="notif-list"><div class="empty">Bildirim yok</div></div>
+  </div>
+</div>
+
+<main class="main-content" style="margin-left: 0">
+  <div class="page-content">
+  <div class="alert-banner" id="arrival-banner">
+    <div class="alert-icon">🔔</div>
+    <div>
+      <div style="font-weight:700;font-size:16px" id="banner-title">Yeni Ziyaretçi Talebi</div>
+      <div style="color:var(--muted);font-size:13px" id="banner-sub">Sizi bekliyor</div>
+    </div>
+    <div class="alert-btn">
+      <button class="btn-approve" onclick="bannerApprove()">✅ Onayla</button>
+      <button class="btn-reject" onclick="bannerReject()">❌ Reddet</button>
+      <button onclick="closeBanner()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;padding:0 8px">✕</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon">⏳</div>
+      <div class="kpi-info"><span class="kpi-label">Giriş Bekleyenler</span><span class="kpi-value"  id="kpi-waiting">—</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-info"><span class="kpi-label">Şu An Kurumdakiler</span><span class="kpi-value"  id="kpi-inside">—</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📅</div>
+      <div class="kpi-info"><span class="kpi-label">Bugünkü Randevular</span><span class="kpi-value"  id="kpi-appts">—</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">👥</div>
+      <div class="kpi-info"><span class="kpi-label">Toplam Günlük Giriş</span><span class="kpi-value"  id="kpi-today">—</span></div>
+    </div>
+    <div class="kpi-card" style="display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:8px;">
+      <div style="font-size:12px; font-weight:700; color:var(--muted)">Outlook Entegrasyonu</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-primary btn-sm" onclick="connectOutlook()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">Bağla</button>
+        <button class="btn-secondary btn-sm" onclick="syncOutlook()">Senkronize Et</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">⏳ Giriş Onayı Bekleyen Misafirler</span>
+        <button class="btn-primary btn-sm" onclick="loadWaiting()">↺</button>
+      </div>
+      <div id="waiting-list"><div class="empty">Yükleniyor...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">✅ Aktif Misafir Listesi</span>
+        <span id="inside-count" class="badge badge-inside">0</span>
+      </div>
+      <div id="inside-list"><div class="empty">Yükleniyor...</div></div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="card">
+      <div class="card-header"><span class="card-title">📅 Güncel Randevu Planı</span></div>
+      <div id="calendar-container" style="padding:10px 20px 0 20px;"></div>
+      <div id="appts-list"><div class="empty">Yükleniyor...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 Günlük Ziyaretçi Kayıtları</span>
+        <button class="btn-primary btn-sm" onclick="loadAll()">↺</button>
+      </div>
+      <div id="all-today-list"><div class="empty">Yükleniyor...</div></div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="card full-width" style="grid-column: span 2">
+      <div class="card-header">
+        <span class="card-title">🏢 Toplantı Odaları ve Rezervasyonlar</span>
+        <button class="btn-primary btn-sm" onclick="showRoomReservation()">+ Yeni Rezervasyon</button>
+      </div>
+      <div id="rooms-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:16px 0;">
+        <div class="empty">Yükleniyor...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="card full-width" style="grid-column: span 2">
+      <div class="card-header">
+        <span class="card-title">📊 Son 30 Günlük Ziyaretçi Trafiği (Tüm Kurum)</span>
+      </div>
+      <div class="chart-wrapper" style="padding:18px 20px 22px; height:340px; position:relative; background:linear-gradient(180deg,#ffffff 0%, #f8fbff 100%); border-radius:0 0 20px 20px;">
+        <canvas id="weeklyTrafficChart" style="width:100% !important; height:100% !important; display:block; background:linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,251,255,0.98)); border:1px solid rgba(148,163,184,0.18); border-radius:18px; padding:10px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alt bölümler (Loglar ve Ayarlar) Admin paneline taşındı -->
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- GENERIC MODAL -->
+<div class="modal-overlay" id="generic-modal-overlay" onclick="closeModal()" style="display:none;">
+  <div class="modal-content" style="background:#fff;border-radius: var(--radius);width:100%;max-width:500px;box-shadow:0 20px 40px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+    <div class="modal-header" style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <h3 style="font-size:18px;font-weight:800;color:var(--text)" id="generic-modal-title">Modal</h3>
+      <button class="btn-link" onclick="closeModal()" style="border:none;padding:4px 8px;box-shadow:none;font-size:18px;color:var(--muted)">✕</button>
+    </div>
+    <div class="modal-body" id="generic-modal-body" style="padding:24px;"></div>
+  </div>
+</div>
+
+<div class="modal" id="add-visitor-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="font-size:16px">Yeni Kayıt</h3>
+      <button class="btn-link" onclick="closeAddVisitorModal()" style="border:none;padding:4px 8px;box-shadow:none">✕</button>
+    </div>
+    <div style="display:flex; border-bottom:1px solid var(--border)">
+      <button id="tab-guest" class="btn-link" style="flex:1; border:none; border-radius:0; padding:12px; font-weight:700; color:var(--primary); border-bottom:2px solid var(--primary)" onclick="switchModalTab('guest')">Anlık Misafir Kaydı</button>
+      <button id="tab-appt" class="btn-link" style="flex:1; border:none; border-radius:0; padding:12px; font-weight:700; color:var(--muted)" onclick="switchModalTab('appt')">İleri Tarihli Randevu</button>
+    </div>
+    <div class="modal-body" style="padding:24px; max-height:85vh; overflow-y:auto">
+      <input type="hidden" id="modal-mode" value="guest">
+      
+      <!-- 1. Kişisel Bilgiler -->
+      <div style="margin-bottom:20px">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px; color:var(--primary); font-weight:800;">
+          <span style="background:var(--primary); color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px">1</span>
+          <span>Kişisel Bilgiler</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Ad Soyad *</label>
+            <input type="text" id="add-name" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="Ahmet Yılmaz">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">TC Kimlik No</label>
+            <input type="text" id="add-tc" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="12345678901">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Telefon</label>
+            <input type="text" id="add-phone" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="0555 123 45 67">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">E-Posta</label>
+            <input type="email" id="add-email" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="ornek@mail.com">
+          </div>
+          <div style="grid-column: span 2">
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Firma / Kurum</label>
+            <input type="text" id="add-company" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="ABC Şirketi">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Ziyaret Bilgileri -->
+      <div style="margin-bottom:10px">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px; color:var(--primary); font-weight:800;">
+          <span style="background:var(--primary); color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px">2</span>
+          <span>Ziyaret Bilgileri</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+          <div id="host-field-wrapper" style="display:none">
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Görüşülecek Personel *</label>
+            <select id="add-host-id" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)">
+              <option value="">Seçiniz...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Ziyaret Sebebi *</label>
+            <input type="text" id="add-reason" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="Toplantı, İş Görüşmesi vb.">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Araç Plakası</label>
+            <input type="text" id="add-plate" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="34 ABC 123">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Kaç Kişi</label>
+            <select id="add-count" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)">
+              <option value="1">1 Kişi</option>
+              <option value="2">2 Kişi</option>
+              <option value="3">3 Kişi</option>
+              <option value="4">4 Kişi</option>
+              <option value="5">5+ Kişi</option>
+            </select>
+          </div>
+          <div style="grid-column: span 2" id="div-time">
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Randevu Tarih & Saat *</label>
+            <input type="datetime-local" id="add-time" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)">
+          </div>
+          <div style="grid-column: span 2">
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Notlar</label>
+            <textarea id="add-notes" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius); height:60px" placeholder="Ek notlar..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:right;margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-link" onclick="closeAddVisitorModal()">İptal</button>
+        <button class="btn-primary" id="btn-submit" style="padding: 10px 24px" onclick="submitAddVisitor()">Kaydet (Hemen Gelecek)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/core/api.js"></script>
+<script src="/js/core/auth.js"></script>
+<script src="/js/core/permissions.js"></script>
+<script src="/js/core/ui.js"></script>
+<script src="/js/core/socket.js"></script>
+<script src="/js/core/notifications.js"></script>
+<script src="/js/core/branding.js"></script>
+<script src="/js/core/formatters.js"></script>
+<script src="/js/core/charts.js"></script>
+<script src="/js/core/password.js"></script>
+<script src="/js/panels/manager-panel.js"></script>
+</body>
+</html>
