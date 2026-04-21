@@ -1,9 +1,26 @@
 node_modules/
 server/uploads/
+public/uploads/
+uploads/
+public/videos/
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv
 public/Assets/
 public/favicon.ico
 .env
 .env.aciklamali
+
+# SSH/private keys must never be committed
+.ssh/
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.pem
+*.key
 
 # Deploy paketleri ve veritabani yedekleri
 *.tar.gz

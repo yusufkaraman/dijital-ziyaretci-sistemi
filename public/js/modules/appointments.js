@@ -72,12 +72,14 @@ function renderCalendarBlock(dateStr) {
 
 async function loadAppointments() {
   loadPendingApprovals();
-  const params = { status: 'planned' };
-  const dateFilter = appointmentDateFilter || 'future';
+  const params = {};
+  const dateFilter = appointmentDateFilter || 'all';
   if (dateFilter === 'future') {
     params.range = 'future';
+    params.status = 'planned';
   } else {
     params.range = dateFilter;
+    if (dateFilter === 'all') params.include_cancelled = 'true';
   }
   if (appointmentCompanyFilter && appointmentCompanyFilter !== 'all') {
     params.company = appointmentCompanyFilter;
@@ -85,10 +87,15 @@ async function loadAppointments() {
 
   const appointments = await api.getAppointments(params);
   appointments.sort((a, b) => new Date(a.planned_time) - new Date(b.planned_time));
+  window._appointmentsCache = appointments;
 
   const filterContainer = document.getElementById('appointments-company-filters');
   if (filterContainer) {
-    const allAppointments = await api.getAppointments({ status: 'planned', range: dateFilter });
+    const allParams = dateFilter === 'future'
+      ? { status: 'planned', range: 'future' }
+      : { range: dateFilter };
+    if (dateFilter === 'all') allParams.include_cancelled = 'true';
+    const allAppointments = await api.getAppointments(allParams);
     const companyList = Array.from(new Set(
       allAppointments
         .map((a) => (a.host_company_name || '').trim())
@@ -130,14 +137,17 @@ async function loadAppointments() {
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn-calendar" onclick='openGoogleCalendar(${JSON.stringify(a).replace(/'/g, "\\'")})'><span>📅</span> Takvime Ekle</button>
+        <button class="btn-calendar" onclick="openGoogleCalendarById(${a.id})"><span>📅</span> Takvime Ekle</button>
+        ${a.status==='pending_approval' ? `<button class="btn-primary" style="font-size:12px;padding:6px 10px;background:var(--green);border-color:var(--green)" onclick="approveAppt(${a.id})">Onayla</button>` : ''}
         ${a.status==='planned' ? `<button class="btn-secondary" style="font-size:12px;padding:6px 10px" onclick="cancelAppt(${a.id})">İptal</button>` : ''}
+        ${a.status==='planned' ? `<button class="btn-primary" style="font-size:12px;padding:6px 10px;background:#10b981;border-color:#10b981" onclick="withButtonLock(this, function(){ return quickCompleteAppt(${a.id}) })">Geldi Gitti</button>` : ''}
+        <button class="btn-secondary" style="font-size:12px;padding:6px 10px;color:var(--red);border-color:#fecaca" onclick="deleteAppt(${a.id})">Sil</button>
       </div>
     </div>`).join('') : '<div class="empty-state" style="padding:64px;text-align:center">📅 Randevu bulunamadı</div>';
 }
 
 function changeAppointmentDateFilter(value) {
-  appointmentDateFilter = value || 'future';
+  appointmentDateFilter = value || 'all';
   loadAppointments();
 }
 
@@ -282,7 +292,7 @@ async function _doSaveAppointment() {
 }
 
 async function showAppointmentDetail(id) {
-  const appointments = await api.getAppointments({ range: 'all' });
+  const appointments = await api.getAppointments({ range: 'all', include_cancelled: 'true' });
   const a = appointments.find(x => x.id == id);
   if (!a) return;
   showModal(`📅 ${esc(a.visitor_name)}`, `
@@ -300,15 +310,42 @@ async function showAppointmentDetail(id) {
       ${a.notes ? `<div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Notlar</div><div>${esc(a.notes)}</div></div>` : ''}
       <div style="display:flex;gap:10px;margin-top:8px">
         ${a.status==='pending_approval' ? `<button class="btn-primary" style="background:var(--green);border:none" onclick="approveAppt(${a.id});closeModal()">✅ Onayla</button> <button class="btn-secondary" style="color:var(--red);border-color:#fecaca" onclick="cancelAppt(${a.id});closeModal()">❌ Reddet</button>` : ''}
-        ${a.status==='planned' ? `<button class="btn-secondary" onclick="cancelAppt(${a.id});closeModal()">İptal Et</button> <button class="btn-calendar" onclick='openGoogleCalendar(${JSON.stringify(a).replace(/'/g, "\\\'")}); closeModal()'>📅 Takvime Ekle</button>` : ''}
+        ${a.status==='planned' ? `<button class="btn-primary" style="background:#10b981;border-color:#10b981" onclick="quickCompleteAppt(window._appointmentDetail.id, window._appointmentDetail.visitor_name);closeModal()">Geldi Gitti</button> <button class="btn-secondary" onclick="cancelAppt(${a.id});closeModal()">İptal Et</button> <button class="btn-calendar" onclick="openGoogleCalendar(window._appointmentDetail); closeModal()">📅 Takvime Ekle</button>` : ''}
+        <button class="btn-secondary" style="color:var(--red);border-color:#fecaca" onclick="deleteAppt(${a.id});closeModal()">Sil</button>
       </div>
     </div>`);
+  window._appointmentDetail = a;
+}
+
+async function quickCompleteAppt(id, visitorName) {
+  if (!confirm(`${visitorName || 'Bu randevu'} geldi/gitti olarak kapatılsın mı?`)) return;
+  try {
+    await api.quickCompleteAppointment(id);
+    showToast('✅ Randevu geldi/gitti olarak kapatıldı.');
+    await loadAppointments();
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+    if (typeof loadRecentCheckins === 'function') loadRecentCheckins();
+  } catch (e) {
+    showToast(e.message || 'Randevu kapatılamadı', 'error');
+  }
 }
 
 async function cancelAppt(id) {
   if (!confirm('Randevu iptal edilsin mi?')) return;
   await api.cancelAppointment(id);
   showToast('Randevu iptal edildi'); loadAppointments();
+}
+
+async function deleteAppt(id) {
+  if (!confirm('Randevu kalıcı olarak silinsin mi?')) return;
+  try {
+    await api.deleteAppointment(id);
+    showToast('Randevu silindi');
+    await loadAppointments();
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+  } catch (e) {
+    showToast(e.message || 'Randevu silinemedi', 'error');
+  }
 }
 
 function openGoogleCalendar(a) {
@@ -349,13 +386,21 @@ function downloadICS(a) {
   URL.revokeObjectURL(url);
 }
 
+function openGoogleCalendarById(id) {
+  const a = (window._appointmentsCache || []).find(x => Number(x.id) === Number(id));
+  if (a) openGoogleCalendar(a);
+}
+
 window.loadAppointments = loadAppointments;
 window.showAppointmentModal = showAppointmentModal;
 window.saveAppointment = saveAppointment;
 window.showAppointmentDetail = showAppointmentDetail;
 window.cancelAppt = cancelAppt;
+window.deleteAppt = deleteAppt;
+window.quickCompleteAppt = quickCompleteAppt;
 window.changeAppointmentDateFilter = changeAppointmentDateFilter;
 window.approveAppt = approveAppt;
 window.openGoogleCalendar = openGoogleCalendar;
+window.openGoogleCalendarById = openGoogleCalendarById;
 window.downloadICS = downloadICS;
 

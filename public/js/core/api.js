@@ -155,6 +155,7 @@ const api = {
   updateAppointment: function(id, data) { return apiJson('/appointments/' + id, 'PUT', data); },
   cancelAppointment: function(id) { return apiFetch('/appointments/' + id + '/cancel', { method: 'PUT' }); },
   approveAppointment: function(id) { return apiFetch('/appointments/' + id + '/approve', { method: 'PUT' }); },
+  quickCompleteAppointment: function(id) { return apiFetch('/appointments/' + id + '/quick-complete', { method: 'POST' }); },
   deleteAppointment: function(id) { return apiFetch('/appointments/' + id, { method: 'DELETE' }); },
 
   // Rooms

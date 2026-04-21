@@ -491,9 +491,46 @@ test('blacklist flow works', async () => {
 });
 
 test('screen and logs endpoints work', async () => {
+  const screenCompany = await prisma.company.create({
+    data: { name: 'Screen Priority Co', isActive: true },
+  });
+  const screenPersonnel = await prisma.personnel.create({
+    data: { fullName: 'Screen Priority Host', companyId: screenCompany.id, isActive: true },
+  });
+  const fastArrival = new Date(Date.now() - 5 * 60 * 1000);
+  const appointmentTime = new Date(Date.now() - 1000);
+  const fastVisitor = await prisma.visitor.create({
+    data: {
+      fullName: 'Fast Screen Visitor',
+      status: 'inside',
+      isApproved: true,
+      isScreenActive: true,
+      arrivalTime: fastArrival,
+      visitedCompanyId: screenCompany.id,
+      hostPersonnelId: screenPersonnel.id,
+    },
+  });
+  const dueAppointment = await prisma.appointment.create({
+    data: {
+      visitorName: 'Due Screen Appointment',
+      status: 'planned',
+      plannedTime: appointmentTime,
+      visitedCompanyId: screenCompany.id,
+      hostPersonnelId: screenPersonnel.id,
+    },
+  });
+
   const current = await request(app).get('/api/screen/current');
   assert.equal(current.status, 200);
   assert.ok('settings' in current.body);
+  assert.equal(current.body.visitor, null);
+  assert.equal(current.body.host_media.source, 'appointment');
+  assert.equal(current.body.host_media.id, dueAppointment.id);
+
+  await prisma.appointment.delete({ where: { id: dueAppointment.id } });
+  await prisma.visitor.delete({ where: { id: fastVisitor.id } });
+  await prisma.personnel.delete({ where: { id: screenPersonnel.id } });
+  await prisma.company.delete({ where: { id: screenCompany.id } });
 
   const logStart = await request(app)
     .post('/api/screen/log')

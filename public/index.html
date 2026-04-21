@@ -82,7 +82,7 @@
     </a>
   </nav>
 
-  <div class="sidebar-user" id="sidebar-user" style="cursor:pointer" onclick="logout()" title="Çıkış Yap">
+  <div class="sidebar-user" id="sidebar-user">
     <div class="user-avatar" id="sidebar-avatar">?</div>
     <div class="user-info">
       <span class="user-name" id="sidebar-name">Yükleniyor...</span>
@@ -109,6 +109,7 @@
         <span>Uygulamayı İndir</span>
       </button>
       <button class="btn-text" onclick="showChangePasswordModal()" style="font-size:13px;padding:6px 12px;color:var(--text-3);border:1px solid var(--border);border-radius:8px;">🔒 Şifre Değiştir</button>
+      <button class="btn-text logout-visible-btn" onclick="logout()" title="Çıkış Yap">Çıkış Yap</button>
       <div class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" placeholder="Ziyaretçi ara..." id="global-search" oninput="globalSearch(this.value)" />
@@ -130,7 +131,7 @@
           <div class="welcome-stat"><div class="welcome-stat-val" id="ws-today">0</div><div class="welcome-stat-lbl">Bugün</div></div>
           <div class="welcome-stat"><div class="welcome-stat-val" id="ws-appts">0</div><div class="welcome-stat-lbl">Randevu</div></div>
         </div>
-        <button class="btn-primary" onclick="navigate('checkin')" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);backdrop-filter:blur(4px);box-shadow:none; padding:14px 30px; font-size:15px;">
+      <button class="btn-primary js-wide-click-btn" onclick="navigate('checkin')" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);backdrop-filter:blur(4px);box-shadow:none; padding:14px 30px; font-size:15px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Yeni Ziyaretçi
         </button>
@@ -188,7 +189,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             CSV Dışa Aktar
           </button>
-          <button class="btn-primary" onclick="navigate('checkin')">
+          <button class="btn-primary topbar-new-visitor-btn js-wide-click-btn" onclick="navigate('checkin')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Yeni Kayıt
           </button>
@@ -292,7 +293,7 @@
             <div class="badge-inline" id="preview-status">Giriş Bekleniyor</div>
           </div>
           <div class="checkin-recent">
-            <div class="card-header"><span class="card-title">Son Girişler</span></div>
+            <div class="card-header"><span class="card-title">Bugünkü Randevu Aksiyonları</span></div>
             <div id="recent-checkins-list"></div>
           </div>
         </div>
@@ -317,7 +318,7 @@
           <option value="prev_month">Ge&#231;en Ay</option>
           <option value="this_year">Bu Y&#305;l</option>
           <option value="prev_year">Ge&#231;en Y&#305;l</option>
-          <option value="all">T&#252;m Randevular</option>
+          <option value="all" selected>T&#252;m Randevular</option>
         </select>
       </div>
       <div id="pending-approvals-section" style="margin-bottom:20px"></div>
@@ -349,21 +350,28 @@
       <div class="screens-grid" id="screens-grid"></div>
 
       <!-- TICKER (Kayan Yazı) Yönetimi -->
-      <div class="dash-card" style="margin-top:24px; max-width:900px">
+      <div class="dash-card" style="margin-top:24px">
         <div class="card-header">
-          <span class="card-title">Lobi Alt Bar Kayan Yazılar</span>
-          <button class="btn-primary btn-sm" onclick="addTickerRow()">+ Yeni Satır</button>
+          <span class="card-title">Firmaya Ozel Lobi Kayan Yazilari</span>
         </div>
         <div style="padding:16px">
           <p style="font-size:12px; color:var(--text-3); margin-bottom:12px">
-            Her satır lobi ekranının alt bandında sırayla kayar. Sıralamayı sürükleyerek veya ok tuşlarıyla değiştirebilirsiniz.
+            Lobi ekraninda hangi firmanin videosu/icerigi aktifse sadece o firmaya ait kayan yazilar gorunur.
           </p>
-          <div id="ticker-rows-container" style="display:flex; flex-direction:column; gap:8px"></div>
+          <div class="form-group" style="max-width:380px;margin-bottom:16px">
+            <label style="display:flex;justify-content:space-between;gap:12px">
+              <span>Kayan yazi hizi</span>
+              <strong><span id="ticker-speed-value">40</span> sn</strong>
+            </label>
+            <input type="range" id="ticker-speed-input" min="8" max="180" step="1" value="40" oninput="updateTickerSpeedLabel(this.value)" style="width:100%">
+          </div>
+          <div id="company-ticker-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px"></div>
           <div class="form-actions" style="margin-top:16px; padding:0">
-            <button class="btn-primary" onclick="saveTickerMessages()">Kayan Yazıları Kaydet</button>
+            <button class="btn-primary" onclick="saveAllCompanyTickerMessages()">Firma Kayan Yazilarini Kaydet</button>
           </div>
         </div>
       </div>
+
     </section>
 
     <!-- HOSTS -->

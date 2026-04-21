@@ -8,7 +8,7 @@ let personnelCache = [];
 let companyCache = [];
 let appointmentPersonnelCache = [];
 let appointmentCompanyFilter = 'all';
-let appointmentDateFilter = 'future';
+let appointmentDateFilter = 'all';
 let personnelCompanyFilter = 'all';
 
 function normalizeCompanyName(value) {
@@ -219,6 +219,7 @@ async function loadPage(page) {
     else if (page === 'appointments') await loadAppointments();
     else if (page === 'rooms') await loadRooms();
     else if (page === 'hosts') await loadPersonnel();
+    else if (page === 'screens') await loadTickerMessages();
     else if (page === 'blacklist') await loadBlacklist();
     else if (page === 'reports') await loadReports();
     else if (page === 'settings') await loadSettings();

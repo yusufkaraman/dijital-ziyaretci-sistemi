@@ -40,6 +40,7 @@
         <div class="visitor-info" style="cursor:pointer" onclick="showAppointmentDetail(${a.id})"><div class="visitor-name">${esc(a.visitor_name)}</div><div class="visitor-meta">🏢 ${esc(a.visitor_company)||'—'} · 🕒 ${formatTime(a.planned_time)} · ${esc(a.host_name)||'—'}</div></div>
       <div class="appointment-row-actions">
         <button class="btn-primary appointment-checkin-btn" onclick='checkInAppointment(${JSON.stringify(a).replace(/'/g, "\\'")})'>Geldi Haber Ver</button>
+        <button class="btn-secondary appointment-checkin-btn" onclick='withButtonLock(this, function(){ return quickCompleteAppointment(${a.id}, ${JSON.stringify(a.visitor_name).replace(/'/g, "\\'")}) })'>Geldi Gitti</button>
       </div>
     </div>`).join('') : '<div class="empty-state">Bugün randevu yok</div>';
 
@@ -127,4 +128,19 @@ async function checkInAppointment(appt) {
     refreshDashboard();
   } catch(e) { showToast(e.message, 'error'); }
 }
+
+async function quickCompleteAppointment(id, visitorName) {
+  if (!confirm(`${visitorName || 'Bu randevu'} geldi/gitti olarak kapatılsın mı?`)) return;
+  try {
+    await api.quickCompleteAppointment(id);
+    showToast('✅ Randevu geldi/gitti olarak kapatıldı.');
+    refreshDashboard();
+    if (typeof loadAppointments === 'function') loadAppointments();
+    if (typeof loadRecentCheckins === 'function') loadRecentCheckins();
+  } catch (e) {
+    showToast(e.message || 'Randevu kapatılamadı', 'error');
+  }
+}
+
+window.quickCompleteAppointment = quickCompleteAppointment;
 

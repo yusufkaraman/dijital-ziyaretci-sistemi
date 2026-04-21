@@ -5,6 +5,7 @@ const { canUseOutlook } = require('../policies/permissions');
 const { resolveHostUserIdFromPersonnel, buildHostUserFilter } = require('../services/appointment-service');
 const { emitSocket } = require('../services/visitor-service');
 const router = express.Router();
+const APPOINTMENT_WRITE_ROLES = ['admin', 'manager', 'secretary', 'personnel'];
 
 /** API contract helper: Prisma camelCase → snake_case */
 function toApiShape(a) {
@@ -40,14 +41,14 @@ function toApiShape(a) {
 // GET /api/appointments
 router.get('/', auth, async (req, res) => {
   try {
-    const { date, month, range, status, host_user_id, company, limit, offset } = req.query;
+    const { date, month, range, status, host_user_id, company, limit, offset, include_cancelled } = req.query;
     const lim = Number.parseInt(limit, 10);
     const off = Number.parseInt(offset, 10);
     const hasLimit  = Number.isInteger(lim) && lim > 0;
     const hasOffset = Number.isInteger(off) && off >= 0;
 
     const now = new Date();
-    const where = { status: { not: 'cancelled' } };
+    const where = include_cancelled === 'true' ? {} : { status: { not: 'cancelled' } };
 
     // Tarih filtresi
     if (range === 'all') {
@@ -110,7 +111,7 @@ router.get('/', auth, async (req, res) => {
       where.plannedTime = { gte: now };
     }
 
-    if (status) where.status = status;
+    if (status && status !== 'all') where.status = status;
 
     if (host_user_id) {
       const hId = Number(host_user_id);
@@ -380,9 +381,144 @@ router.post('/:id/checkin', auth, async (req, res) => {
   }
 });
 
+// POST /api/appointments/:id/quick-complete - Randevu geldi/gitti olarak kapat
+router.post('/:id/quick-complete', auth, async (req, res) => {
+  try {
+    if (!APPOINTMENT_WRITE_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Randevu kapatma yetkiniz yok' });
+    }
+
+    const appt = await prisma.appointment.findFirst({
+      where: { id: Number(req.params.id), status: 'planned' },
+      include: {
+        hostPersonnel: {
+          select: { fullName: true, title: true, email: true, company: { select: { id: true, name: true, logoPath: true } } },
+        },
+        visitedCompany: {
+          select: { id: true, name: true, logoPath: true },
+        },
+      },
+    });
+    if (!appt) return res.status(404).json({ error: 'Planli randevu bulunamadi veya islem yapilmis' });
+    if (req.user.role === 'personnel' && Number(appt.hostUserId) !== Number(req.user.id)) {
+      return res.status(403).json({ error: 'Sadece kendi randevunuzu kapatabilirsiniz' });
+    }
+
+    const now = new Date();
+    const plannedAt = new Date(appt.plannedTime);
+    const arrivalTime = plannedAt.getTime() <= now.getTime() ? plannedAt : now;
+    const checkoutTime = now.getTime() > arrivalTime.getTime()
+      ? now
+      : new Date(arrivalTime.getTime() + 60 * 1000);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const visitor = await tx.visitor.create({
+        data: {
+          fullName:        appt.visitorName,
+          tcNo:            appt.visitorTc,
+          phone:           appt.visitorPhone,
+          email:           appt.visitorEmail,
+          companyName:     appt.visitorCompany,
+          vehiclePlate:    appt.vehiclePlate,
+          visitorCount:    appt.visitorCount || 1,
+          visitedCompanyId: appt.visitedCompanyId,
+          hostPersonnelId: appt.hostPersonnelId,
+          hostUserId:      appt.hostUserId,
+          reason:          appt.reason || `Randevu: ${appt.visitorName}`,
+          notes:           appt.notes,
+          status:          'left',
+          isApproved:      true,
+          isScreenActive:  false,
+          plannedTime:     appt.plannedTime,
+          arrivalTime,
+          checkoutTime,
+          createdBy:       req.user.id,
+        },
+        include: {
+          hostPersonnel: {
+            select: { fullName: true, title: true, company: { select: { id: true, name: true, logoPath: true } } },
+          },
+          visitedCompany: {
+            select: { id: true, name: true, logoPath: true },
+          },
+        },
+      });
+
+      const appointment = await tx.appointment.update({
+        where: { id: appt.id },
+        data: { status: 'completed', visitorId: visitor.id },
+        include: {
+          hostPersonnel: {
+            select: { fullName: true, title: true, email: true, company: { select: { id: true, name: true, logoPath: true } } },
+          },
+          visitedCompany: {
+            select: { id: true, name: true, logoPath: true },
+          },
+        },
+      });
+
+      await tx.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'appointment_quick_complete',
+          entityType: 'appointment',
+          entityId: appt.id,
+          details: `${appt.visitorName} randevusu geldi/gitti olarak kapatildi`,
+        },
+      });
+
+      return { visitor, appointment };
+    });
+
+    const visitorShape = {
+      id:               result.visitor.id,
+      full_name:        result.visitor.fullName,
+      tc_no:            result.visitor.tcNo,
+      phone:            result.visitor.phone,
+      email:            result.visitor.email,
+      company_name:     result.visitor.companyName,
+      vehicle_plate:    result.visitor.vehiclePlate,
+      visitor_count:    result.visitor.visitorCount,
+      visited_company_id: result.visitor.visitedCompanyId,
+      host_personnel_id: result.visitor.hostPersonnelId,
+      host_user_id:     result.visitor.hostUserId,
+      reason:           result.visitor.reason,
+      notes:            result.visitor.notes,
+      status:           result.visitor.status,
+      is_approved:      result.visitor.isApproved ? 1 : 0,
+      is_screen_active: result.visitor.isScreenActive ? 1 : 0,
+      planned_time:     result.visitor.plannedTime,
+      arrival_time:     result.visitor.arrivalTime,
+      checkout_time:    result.visitor.checkoutTime,
+      created_by:       result.visitor.createdBy,
+      created_at:       result.visitor.createdAt,
+      host_name:         result.visitor.hostPersonnel?.fullName ?? null,
+      host_title:        result.visitor.hostPersonnel?.title ?? null,
+      host_company_id:   result.visitor.visitedCompany?.id ?? result.visitor.hostPersonnel?.company?.id ?? null,
+      host_company_name: result.visitor.visitedCompany?.name ?? result.visitor.hostPersonnel?.company?.name ?? null,
+      host_company_logo: result.visitor.visitedCompany?.logoPath ?? result.visitor.hostPersonnel?.company?.logoPath ?? null,
+    };
+    const appointmentShape = toApiShape(result.appointment);
+
+    if (global.io) {
+      global.io.emit('appointment:updated', { appointment: appointmentShape });
+      global.io.emit('visitor:checkout', { visitor: visitorShape, host_user_id: visitorShape.host_user_id });
+      global.io.emit('screen:update', { action: 'checkout', visitor: visitorShape });
+    }
+
+    res.json({ appointment: appointmentShape, visitor: visitorShape });
+  } catch (e) {
+    console.error('POST /api/appointments/:id/quick-complete hatasi:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // DELETE /api/appointments/:id
 router.delete('/:id', auth, async (req, res) => {
   try {
+    if (!['admin', 'secretary'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Randevu silme yetkiniz yok' });
+    }
     const deletedId = Number(req.params.id);
     await prisma.appointment.delete({ where: { id: deletedId } });
     if (global.io) global.io.emit('appointment:deleted', { id: deletedId });

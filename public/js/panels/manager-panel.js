@@ -382,6 +382,28 @@ function apptStatusLabel(s) {
   return { planned:'Planlandı', pending_approval:'Onay Bekliyor', arrived:'Geldi', completed:'Tamamlandı', cancelled:'İptal' }[s] || s;
 }
 
+async function quickCompleteAppointment(id, visitorName) {
+  if (!confirm((visitorName || 'Bu randevu') + ' geldi/gitti olarak kapatılsın mı?')) return;
+  try {
+    await api.quickCompleteAppointment(id);
+    showToast('Randevu geldi/gitti olarak kapatıldı.');
+    loadAll();
+  } catch (e) {
+    showToast(e.message || 'Randevu kapatılamadı', 'error');
+  }
+}
+
+function bindQuickCompleteButtons(root) {
+  (root || document).querySelectorAll('.js-quick-complete-appt').forEach(function(btn) {
+    btn.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      return withButtonLock(btn, function() {
+        return quickCompleteAppointment(Number(btn.getAttribute('data-appt-id')), btn.getAttribute('data-appt-name') || '');
+      });
+    });
+  });
+}
+
 async function showVisitorDetail(id) {
   var visitors = await api.getVisitors({});
   var v = visitors.find(function(x) { return x.id == id; });
@@ -418,7 +440,7 @@ async function showAppointmentDetail(id) {
     '</div>' +
     (a.notes ? '<div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Notlar</div><div>' + esc(a.notes) + '</div></div>' : '') +
     '<div style="display:flex;gap:10px;margin-top:8px">' +
-    (a.status === 'planned' ? '<button class="btn-secondary" onclick="cancelAppt(' + a.id + ');closeModal()">İptal Et</button> <button class="btn-calendar" onclick="openGoogleCalendar(_lastApptDetail);closeModal()">📅 Takvime Ekle</button>' : '') +
+    (a.status === 'planned' ? '<button class="btn-primary" style="background:#10b981;border-color:#10b981" onclick="quickCompleteAppointment(_lastApptDetail.id, _lastApptDetail.visitor_name);closeModal()">Geldi Gitti</button> <button class="btn-secondary" onclick="cancelAppt(' + a.id + ');closeModal()">İptal Et</button> <button class="btn-calendar" onclick="openGoogleCalendar(_lastApptDetail);closeModal()">📅 Takvime Ekle</button>' : '') +
     '</div></div>');
   window._lastApptDetail = a;
 }
@@ -427,20 +449,22 @@ async function showAppointmentDetail(id) {
 
 function loadRecentArrivals() {
   var u = getUser();
-  var params = { status: 'inside', date: 'today' };
+  var params = { status: 'planned', date: 'today' };
   if (u && shouldScopeToHost(u)) params.host_user_id = u.id;
-  return api.getVisitors(params).then(function(list) {
+  return api.getAppointments(params).then(function(list) {
     var el = document.getElementById('waiting-list');
-    if (!list.length) { el.innerHTML = '<div class="empty-state">Bugün yeni fast check-in kaydı bulunmamaktadır.</div>'; return; }
-    el.innerHTML = list.map(function(v) {
-      return '<div class="visitor-row" style="border-left:4px solid var(--orange)">' +
-        '<div class="visitor-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">' + esc(v.full_name[0]) + '</div>' +
-        '<div class="visitor-info"><div class="visitor-name">' + esc(v.full_name) + '</div>' +
-        '<div class="visitor-meta">' + esc(v.company_name || '—') + ' · ' + esc(v.reason || '—') + ' · ' + visitorTimeSummary(v, fmt) + '</div></div>' +
-        '<span class="status-badge status-inside">Misafir Geldi</span>' +
+    list.sort(function(a, b) { return new Date(a.planned_time) - new Date(b.planned_time); });
+    if (!list.length) { el.innerHTML = '<div class="empty-state">Bugün açık randevu aksiyonu yok.</div>'; return; }
+    el.innerHTML = list.map(function(a) {
+      return '<div class="visitor-row" style="border-left:4px solid #10b981">' +
+        '<div class="visitor-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">' + esc((a.visitor_name || '?')[0]) + '</div>' +
+        '<div class="visitor-info" style="cursor:pointer" onclick="showAppointmentDetail(' + a.id + ')"><div class="visitor-name">' + esc(a.visitor_name) + '</div>' +
+        '<div class="visitor-meta">' + fmt(a.planned_time) + ' · ' + esc(a.visitor_company || '—') + ' · ' + esc(a.host_name || '—') + '</div></div>' +
+        '<button class="btn-primary js-quick-complete-appt" data-appt-id="' + a.id + '" data-appt-name="' + esc(a.visitor_name || '') + '" style="font-size:11px;padding:6px 10px;background:#10b981;border-color:#10b981;white-space:nowrap">Geldi Gitti</button>' +
         '</div>';
     }).join('');
-  }).catch(function(e) { console.warn('Son gelenler:', e.message); });
+    bindQuickCompleteButtons(el);
+  }).catch(function(e) { console.warn('Randevu aksiyonlari:', e.message); });
 }
 
 function loadInside() {
@@ -625,6 +649,7 @@ function showDayDetail(dateStr) {
         '<div style="display:flex;align-items:center;gap:6px">' +
         '<span class="status-badge status-' + a.status + '">' + (statMap[a.status] || a.status) + '</span>' +
         '<button class="btn-calendar" data-appt-id="' + a.id + '">📅 Ekle</button>' +
+        (a.status === 'planned' ? '<button class="btn-primary js-quick-complete-appt" data-appt-id="' + a.id + '" data-appt-name="' + esc(a.visitor_name || '') + '" style="font-size:11px;padding:5px 10px;background:#10b981;border-color:#10b981">Geldi Gitti</button>' : '') +
         (a.status === 'planned' ? '<button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="withButtonLock(this, function(){ return cancelAppt(' + a.id + ') })">İptal</button>' : '') +
         '</div></div>';
     }).join('');
@@ -634,6 +659,7 @@ function showDayDetail(dateStr) {
       var appt = dayAppts.find(function(a) { return a.id === apptId; });
       if (appt) btn.addEventListener('click', function() { openGoogleCalendar(appt); });
     });
+    bindQuickCompleteButtons(list);
   }
   panel.style.display = 'block';
 }
@@ -693,6 +719,41 @@ function loadTodayAll() {
   }).catch(function(e) { console.warn('Bugün tümü:', e.message); });
 }
 
+function formatRoomTime(value) {
+  return new Date(value).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderRoomReservationList(room) {
+  const reservations = room.reservations || [];
+  if (!reservations.length) return '<div class="empty-state" style="padding:18px;text-align:center">Bugün rezervasyon yok.</div>';
+  return reservations.map(function(res) {
+    return '<div class="visitor-row" style="margin-bottom:8px">' +
+      '<div class="visitor-info">' +
+        '<div class="visitor-name">' + esc(res.title || 'Rezervasyon') + '</div>' +
+        '<div class="visitor-meta">' + formatRoomTime(res.start_time) + ' - ' + formatRoomTime(res.end_time) + (res.user_name ? ' · ' + esc(res.user_name) : '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function showRoomDetail(id) {
+  const rooms = await api.getRooms();
+  const room = rooms.find(function(r) { return Number(r.id) === Number(id); });
+  if (!room) return showToast('Oda bulunamadı', 'error');
+  showModal(esc(room.name), '<div style="display:grid;gap:14px">' +
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">' +
+      '<div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Kapasite</div><div>' + esc(String(room.capacity || 0)) + ' Kişi</div></div>' +
+      '<div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Durum</div><span class="status-badge status-inside">' + (room.is_active === false ? 'Pasif' : 'Aktif') + '</span></div>' +
+    '</div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Ekipman</div><div>' + esc(room.equipment || 'Ekipman yok') + '</div></div>' +
+    '<div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:8px">Bugünkü Rezervasyonlar</div>' + renderRoomReservationList(room) + '</div>' +
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">' +
+      '<button class="btn-secondary" onclick="closeModal()">Kapat</button>' +
+      '<button class="btn-primary" onclick="closeModal();showRoomReservation(' + room.id + ')">Rezervasyon Yap</button>' +
+    '</div>' +
+  '</div>');
+}
+
 async function loadRooms() {
   try {
     const rooms = await api.getRooms();
@@ -704,12 +765,12 @@ async function loadRooms() {
       const activeRes = (r.reservations || []).map(res => `
         <div style="font-size:12px;background:rgba(245,158,11,0.1);color:#d97706;padding:4px 8px;border-radius:4px;margin-bottom:4px;display:flex;justify-content:space-between;">
            <span>🕒 ${new Date(res.start_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} - ${new Date(res.end_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} | ${esc(res.title)}</span>
-           ${u && window.vdPermissions && window.vdPermissions.canCancelReservation(u, res.user_id) ? `<button style="background:none;border:none;color:red;cursor:pointer;font-size:10px" onclick="withButtonLock(this, function(){ return cancelReservation(${res.id}) })">İptal</button>`:''}
+           ${u && window.vdPermissions && window.vdPermissions.canCancelReservation(u, res.user_id) ? `<button style="background:none;border:none;color:red;cursor:pointer;font-size:10px" onclick="event.stopPropagation();withButtonLock(this, function(){ return cancelReservation(${res.id}) })">İptal</button>`:''}
         </div>
       `).join('');
 
       return `
-      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer" onclick="showRoomDetail(${r.id})">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div style="font-weight:800;font-size:15px;color:var(--text)">${esc(r.name)}</div>
           <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.1);color:#10b981;font-weight:700">👥 ${r.capacity} Kişi</span>
@@ -724,7 +785,7 @@ async function loadRooms() {
   } catch(e) { console.warn('Odalar:', e.message); }
 }
 
-async function showRoomReservation() {
+async function showRoomReservation(forceId) {
   try {
     const rooms = await api.getRooms();
     const todayStr = new Date().toISOString().split('T')[0];
@@ -735,7 +796,7 @@ async function showRoomReservation() {
           <label style="font-size:12px;font-weight:700">Toplantı Odası *</label>
           <select id="res-room" class="form-input" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border)">
             <option value="">Seçiniz...</option>
-            ${rooms.map(r => `<option value="${r.id}">${esc(r.name)} (${r.capacity} Kişi)</option>`).join('')}
+            ${rooms.map(r => `<option value="${r.id}" ${Number(forceId) === Number(r.id) ? 'selected' : ''}>${esc(r.name)} (${r.capacity} Kişi)</option>`).join('')}
           </select>
         </div>
         <div class="form-group">

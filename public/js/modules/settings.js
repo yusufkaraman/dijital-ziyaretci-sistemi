@@ -323,6 +323,19 @@ function formatFileSize(bytes) {
 // ── İçerik cache (edit modal için) ──
 let _contentsCache = [];
 let _companiesCache = [];
+let _tickerSettingsCache = {};
+let _companyTickerMap = {};
+let _selectedCompanyTickerId = '';
+
+function parseCompanyTickerMap(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
 
 async function loadScreensContent() {
   const [contents, companies] = await Promise.all([api.getContents(), api.getCompanies()]);
@@ -452,7 +465,17 @@ async function loadTickerMessages() {
   const container = document.getElementById('ticker-rows-container');
   if (!container) return;
   try {
-    const s = await api.getSettings();
+    const [s, companies] = await Promise.all([
+      api.getSettings(),
+      _companiesCache.length ? Promise.resolve(_companiesCache) : api.getCompanies({ active_only: 'false' }),
+    ]);
+    _tickerSettingsCache = s || {};
+    _companiesCache = companies || [];
+    _companyTickerMap = parseCompanyTickerMap(s.ticker_company_texts ? s.ticker_company_texts.value : '');
+
+    const speedInput = document.getElementById('ticker-speed-input');
+    if (speedInput) speedInput.value = s.ticker_speed ? (s.ticker_speed.value || '40') : '40';
+
     const tickerValue = s.ticker_text ? (s.ticker_text.value || '') : '';
     const msgs = tickerValue.split('|').map(m => m.trim()).filter(Boolean);
     container.innerHTML = '';
@@ -461,10 +484,12 @@ async function loadTickerMessages() {
     } else {
       msgs.forEach(m => addTickerRow(m));
     }
+    loadCompanyTickerEditor();
   } catch (e) {
     console.warn('Ticker load error', e);
     container.innerHTML = '';
     addTickerRow();
+    loadCompanyTickerEditor();
   }
 }
 
@@ -502,6 +527,87 @@ function moveTickerRow(btn, direction) {
   }
 }
 
+function loadCompanyTickerEditor() {
+  const select = document.getElementById('company-ticker-select');
+  if (!select) return;
+  const companies = (_companiesCache || []).filter((company) => company && company.id);
+  if (!companies.length) {
+    select.innerHTML = '<option value="">Firma bulunamadı</option>';
+    renderCompanyTickerRows();
+    return;
+  }
+
+  const currentValue = _selectedCompanyTickerId || select.value || String(companies[0].id);
+  select.innerHTML = companies.map((company) =>
+    `<option value="${company.id}">${esc(company.name)}</option>`
+  ).join('');
+  select.value = companies.some((company) => String(company.id) === String(currentValue))
+    ? String(currentValue)
+    : String(companies[0].id);
+  _selectedCompanyTickerId = select.value;
+  renderCompanyTickerRows();
+}
+
+function getSelectedCompanyTickerId() {
+  const select = document.getElementById('company-ticker-select');
+  const id = select ? String(select.value || '') : '';
+  _selectedCompanyTickerId = id;
+  return id;
+}
+
+function renderCompanyTickerRows() {
+  const container = document.getElementById('company-ticker-rows-container');
+  if (!container) return;
+  const companyId = getSelectedCompanyTickerId();
+  const tickerValue = companyId ? (_companyTickerMap[companyId] || '') : '';
+  const msgs = tickerValue.split('|').map(m => m.trim()).filter(Boolean);
+  container.innerHTML = '';
+  if (!companyId) {
+    container.innerHTML = '<div class="empty-state">Once firma secin.</div>';
+    return;
+  }
+  if (!msgs.length) {
+    addCompanyTickerRow();
+    return;
+  }
+  msgs.forEach((msg) => addCompanyTickerRow(msg));
+}
+
+function addCompanyTickerRow(text) {
+  const container = document.getElementById('company-ticker-rows-container');
+  if (!container) return;
+  if (container.classList.contains('empty-state')) container.innerHTML = '';
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px';
+  row.innerHTML = `
+    <span style="cursor:grab;color:var(--text-3);font-size:16px" title="Sirala">⠿</span>
+    <input type="text" class="form-input company-ticker-msg-input" value="${esc(text || '')}" placeholder="Firmaya ozel kayan yazi metni..." style="flex:1">
+    <button class="btn-text" style="color:var(--text-3)" onclick="moveCompanyTickerRow(this,-1)" title="Yukari">▲</button>
+    <button class="btn-text" style="color:var(--text-3)" onclick="moveCompanyTickerRow(this,1)" title="Asagi">▼</button>
+    <button class="btn-text" style="color:var(--red);font-size:16px" onclick="removeCompanyTickerRow(this)" title="Sil">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeCompanyTickerRow(btn) {
+  const row = btn.closest('div');
+  const container = document.getElementById('company-ticker-rows-container');
+  if (container && container.children.length <= 1) {
+    return showToast('En az bir satir kalsin; firmaya ozel yaziyi bos birakmak icin metni silip kaydedin.', 'error');
+  }
+  row.remove();
+}
+
+function moveCompanyTickerRow(btn, direction) {
+  const row = btn.closest('div');
+  const container = row.parentElement;
+  if (direction === -1 && row.previousElementSibling) {
+    container.insertBefore(row, row.previousElementSibling);
+  } else if (direction === 1 && row.nextElementSibling) {
+    container.insertBefore(row.nextElementSibling, row);
+  }
+}
+
 let _saveTickerBusy = false;
 async function saveTickerMessages() {
   if (_saveTickerBusy) return;
@@ -514,10 +620,165 @@ async function saveTickerMessages() {
       return showToast('En az bir kayan yazı mesaji girin', 'error');
     }
     const tickerText = msgs.join(' | ');
-    await api.updateSettings({ ticker_text: tickerText });
+    const speedInput = document.getElementById('ticker-speed-input');
+    const speed = Math.max(8, Math.min(180, Number(speedInput ? speedInput.value : 40) || 40));
+    if (speedInput) speedInput.value = String(speed);
+    await api.updateSettings({ ticker_text: tickerText, ticker_speed: String(speed) });
     showToast('Kayan yazılar kaydedildi');
   } catch (e) { showToast(e.message, 'error'); }
   _saveTickerBusy = false;
+}
+
+let _saveCompanyTickerBusy = false;
+async function saveCompanyTickerMessages() {
+  if (_saveCompanyTickerBusy) return;
+  _saveCompanyTickerBusy = true;
+  try {
+    const companyId = getSelectedCompanyTickerId();
+    if (!companyId) {
+      _saveCompanyTickerBusy = false;
+      return showToast('Firma secin', 'error');
+    }
+    const inputs = document.querySelectorAll('#company-ticker-rows-container .company-ticker-msg-input');
+    const msgs = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+    const nextMap = Object.assign({}, _companyTickerMap);
+    if (msgs.length) nextMap[companyId] = msgs.join(' | ');
+    else delete nextMap[companyId];
+    await api.updateSettings({ ticker_company_texts: JSON.stringify(nextMap) });
+    _companyTickerMap = nextMap;
+    showToast('Firmaya ozel kayan yazilar kaydedildi');
+  } catch (e) { showToast(e.message, 'error'); }
+  _saveCompanyTickerBusy = false;
+}
+
+// Firma bazli yeni kayan yazi editoru. Eski genel editor fonksiyonlarini bilincli olarak override eder.
+function updateTickerSpeedLabel(value) {
+  const speed = Math.max(8, Math.min(180, Number(value) || 40));
+  const label = document.getElementById('ticker-speed-value');
+  if (label) label.textContent = String(speed);
+}
+
+async function loadTickerMessages() {
+  const container = document.getElementById('company-ticker-cards');
+  if (!container) return;
+  try {
+    const [s, companies] = await Promise.all([
+      api.getSettings(),
+      _companiesCache.length ? Promise.resolve(_companiesCache) : api.getCompanies({ active_only: 'false' }),
+    ]);
+    _tickerSettingsCache = s || {};
+    _companiesCache = companies || [];
+    _companyTickerMap = parseCompanyTickerMap(s.ticker_company_texts ? s.ticker_company_texts.value : '');
+
+    const speedInput = document.getElementById('ticker-speed-input');
+    const speed = s.ticker_speed ? (s.ticker_speed.value || '40') : '40';
+    if (speedInput) speedInput.value = speed;
+    updateTickerSpeedLabel(speed);
+    renderCompanyTickerCards();
+  } catch (e) {
+    console.warn('Ticker load error', e);
+    container.innerHTML = '<div class="empty-state">Kayan yazi ayarlari yuklenemedi.</div>';
+  }
+}
+
+function renderCompanyTickerCards() {
+  const container = document.getElementById('company-ticker-cards');
+  if (!container) return;
+  const companies = (_companiesCache || []).filter((company) => company && company.id);
+  if (!companies.length) {
+    container.innerHTML = '<div class="empty-state">Firma bulunamadi.</div>';
+    return;
+  }
+
+  container.innerHTML = companies.map((company) => {
+    const companyId = String(company.id);
+    const msgs = String(_companyTickerMap[companyId] || '').split('|').map(m => m.trim()).filter(Boolean);
+    const rows = msgs.length ? msgs : [''];
+    return `
+      <div class="company-ticker-card" data-company-id="${companyId}" style="border:1px solid var(--border);border-radius:10px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            ${company.logo_path ? `<img src="${esc(company.logo_path)}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#fff;border:1px solid var(--border);padding:2px" />` : `<div style="width:28px;height:28px;border-radius:4px;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">-</div>`}
+            <strong style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(company.name)}</strong>
+          </div>
+          <button class="btn-secondary" style="font-size:11px;padding:5px 9px" onclick="addCompanyTickerRow(${company.id})">+ Satir</button>
+        </div>
+        <div class="company-ticker-rows" style="display:flex;flex-direction:column;gap:8px">
+          ${rows.map((msg) => companyTickerRowHtml(msg)).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function companyTickerRowHtml(text) {
+  return `
+    <div class="company-ticker-row" style="display:flex;align-items:center;gap:8px">
+      <input type="text" class="form-input company-ticker-msg-input" value="${esc(text || '')}" placeholder="Firmaya ozel kayan yazi metni..." style="flex:1">
+      <button class="btn-text" style="color:var(--text-3)" onclick="moveCompanyTickerRow(this,-1)" title="Yukari">▲</button>
+      <button class="btn-text" style="color:var(--text-3)" onclick="moveCompanyTickerRow(this,1)" title="Asagi">▼</button>
+      <button class="btn-text" style="color:var(--red);font-size:16px" onclick="removeCompanyTickerRow(this)" title="Sil">✕</button>
+    </div>`;
+}
+
+function addCompanyTickerRow(companyId) {
+  const card = document.querySelector(`.company-ticker-card[data-company-id="${companyId}"]`);
+  const rows = card ? card.querySelector('.company-ticker-rows') : null;
+  if (!rows) return;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = companyTickerRowHtml('');
+  rows.appendChild(wrapper.firstElementChild);
+}
+
+function removeCompanyTickerRow(btn) {
+  const row = btn.closest('.company-ticker-row');
+  const rows = row ? row.parentElement : null;
+  if (rows && rows.children.length <= 1) {
+    const input = row.querySelector('.company-ticker-msg-input');
+    if (input) input.value = '';
+    return;
+  }
+  if (row) row.remove();
+}
+
+function moveCompanyTickerRow(btn, direction) {
+  const row = btn.closest('.company-ticker-row');
+  const container = row ? row.parentElement : null;
+  if (!row || !container) return;
+  if (direction === -1 && row.previousElementSibling) {
+    container.insertBefore(row, row.previousElementSibling);
+  } else if (direction === 1 && row.nextElementSibling) {
+    container.insertBefore(row.nextElementSibling, row);
+  }
+}
+
+async function saveAllCompanyTickerMessages() {
+  if (_saveCompanyTickerBusy) return;
+  _saveCompanyTickerBusy = true;
+  try {
+    const nextMap = {};
+    document.querySelectorAll('.company-ticker-card').forEach((card) => {
+      const companyId = card.getAttribute('data-company-id');
+      const inputs = card.querySelectorAll('.company-ticker-msg-input');
+      const msgs = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+      if (companyId && msgs.length) nextMap[companyId] = msgs.join(' | ');
+    });
+    const speedInput = document.getElementById('ticker-speed-input');
+    const speed = Math.max(8, Math.min(180, Number(speedInput ? speedInput.value : 40) || 40));
+    if (speedInput) speedInput.value = String(speed);
+    updateTickerSpeedLabel(speed);
+    await api.updateSettings({
+      ticker_company_texts: JSON.stringify(nextMap),
+      ticker_speed: String(speed),
+      ticker_text: '',
+    });
+    _companyTickerMap = nextMap;
+    showToast('Firma kayan yazilari kaydedildi');
+  } catch (e) { showToast(e.message, 'error'); }
+  _saveCompanyTickerBusy = false;
+}
+
+function saveTickerMessages() {
+  return saveAllCompanyTickerMessages();
 }
 
 // ── LOBİ AYARLARI (Admin) ──────────────────────────────

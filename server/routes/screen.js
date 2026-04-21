@@ -23,7 +23,8 @@ const screenAuth = (req, res, next) => {
 // GET /api/screen/current — lobi ekranı için mevcut durum
 router.get('/current', async (req, res) => {
   try {
-    res.json(await loadCurrentScreenState());
+    const debug = req.query.debug === '1' || req.query.debug === 'true';
+    res.json(await loadCurrentScreenState({ debug }));
   } catch (e) {
     console.error('GET /api/screen/current hatası:', e.message);
     res.status(500).json({ error: e.message });

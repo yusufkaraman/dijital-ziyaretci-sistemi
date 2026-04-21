@@ -15,6 +15,23 @@ const safeEsc = (value) => {
     .replace(/'/g, '&#39;');
 };
 
+const DEBUG_PARAM = new URLSearchParams(window.location.search);
+if (DEBUG_PARAM.get('debug') === '1' || DEBUG_PARAM.get('lobi_debug') === '1') {
+  localStorage.setItem('lobi_debug', '1');
+}
+if (DEBUG_PARAM.get('debug') === '0' || DEBUG_PARAM.get('lobi_debug') === '0') {
+  localStorage.removeItem('lobi_debug');
+}
+const LOBI_DEBUG = localStorage.getItem('lobi_debug') === '1';
+function debugLog(label, payload) {
+  if (!LOBI_DEBUG) return;
+  console.log(`[LobiDebug] ${label}`, payload || '');
+}
+function screenCurrentPath() {
+  return '/screen/current' + (LOBI_DEBUG ? '?debug=1' : '');
+}
+debugLog('enabled', { href: window.location.href });
+
 // ── SVG Hava Durumu İkonları ──────────────────────────
 const WEATHER_SVG = {
   sunny: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -194,6 +211,45 @@ const MAX_CACHED_MEDIA_ITEMS = 200;
 const failedMediaSources = new Set();
 let currentVisitorCardMedia = null;
 let activeHostMediaContext = null;
+let lobbySettingsCache = {};
+
+function parseTickerCompanyTexts(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function getTickerMessagesForCompany(companyId) {
+  const companyMap = parseTickerCompanyTexts(lobbySettingsCache.ticker_company_texts || '');
+  const text = companyId ? companyMap[String(companyId)] || '' : '';
+  return text.split('|').map(m => m.trim()).filter(Boolean);
+}
+
+function applyTickerForCompany(companyId) {
+  const tickerEl = $('lb-ticker-inner');
+  if (!tickerEl) return;
+  const msgs = getTickerMessagesForCompany(companyId);
+  tickerEl.innerHTML = msgs.map(m =>
+    `<span class="lb-ticker-item">${safeEsc(m)}</span>`
+  ).join('');
+  const speed = Math.max(8, Math.min(180, Number(lobbySettingsCache.ticker_speed || 40) || 40));
+  tickerEl.style.animationDuration = speed + 's';
+}
+
+function getVisibleTickerCompanyId() {
+  if (isCompanyMode && currentCompanyId) return currentCompanyId;
+  const currentItem = mediaQueue[mediaIdx] || null;
+  if (currentItem && currentItem.company_id) return Number(currentItem.company_id);
+  return null;
+}
+
+function refreshVisibleTicker() {
+  applyTickerForCompany(getVisibleTickerCompanyId());
+}
 
 function showMediaPlaceholder() {
   const ph = $('lb-video-placeholder');
@@ -218,6 +274,12 @@ function setVisitorCardMedia(item) {
 
    wrap.classList.remove('is-logo-plate', 'is-light-logo');
    img.classList.remove('is-light-logo');
+   wrap.style.removeProperty('--logo-plate-aspect');
+   wrap.style.removeProperty('--logo-plate-w');
+   wrap.style.removeProperty('--logo-rgb');
+   wrap.style.removeProperty('--logo-r');
+   wrap.style.removeProperty('--logo-g');
+   wrap.style.removeProperty('--logo-b');
 
   if (item && item.type === 'image' && item.src) {
     currentVisitorCardMedia = item;
@@ -228,7 +290,7 @@ function setVisitorCardMedia(item) {
       wrap.classList.add('is-logo-plate');
       applyAdaptiveLogoPlate(img, wrap);
     }
-    wrap.style.display = 'block';
+    wrap.style.display = 'flex';
     return;
   }
 
@@ -248,6 +310,7 @@ function normalizeMediaItems(items) {
       src: c.file_path,
       title: c.title || '',
       company_id: c.company_id || null,
+      company_name: c.company_name || '',
     }));
 }
 
@@ -261,6 +324,60 @@ function getCompanyTaggedImage(companyId) {
   return healthyItems.find((item) =>
     item.type === 'image' && Number(item.company_id) === Number(companyId)
   ) || null;
+}
+
+function getCompanyTaggedMediaItems(companyId) {
+  if (!companyId) return [];
+  return getHealthyMediaItems(cachedMediaItems)
+    .filter((item) => Number(item.company_id) === Number(companyId));
+}
+
+function normalizeCompanyKey(value) {
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .replace(/\s+/g, ' ');
+}
+
+function findCachedCompanyIdByName(name) {
+  const key = normalizeCompanyKey(name);
+  if (!key) return null;
+  const item = cachedMediaItems.find((media) => normalizeCompanyKey(media.company_name) === key);
+  const companyId = item && Number(item.company_id);
+  return Number.isFinite(companyId) ? companyId : null;
+}
+
+function resolveContentCompanyId(context) {
+  const sourceName = normalizeCompanyKey(context && context.host_company_name);
+  if (sourceName === 'bıkmaz grup' || sourceName === 'bikmaz grup' || sourceName === 'bıkmaz' || sourceName === 'bikmaz') {
+    return findCachedCompanyIdByName('SmartICT') || 5;
+  }
+  return getHostMediaCompanyId(context);
+}
+
+function startCompanyContentFromItems(companyId, items) {
+  const companyItems = getHealthyMediaItems(items);
+  const imageItem = companyItems.find((item) => item.type === 'image') || null;
+  const videoItems = companyItems.filter((item) => item.type === 'video');
+
+  if (!companyItems.length) return false;
+
+  if (!isCompanyMode) {
+    normalMediaQueue = buildNormalMediaQueue();
+  }
+
+  isCompanyMode = true;
+  currentCompanyId = companyId;
+  setVisitorCardMedia(imageItem ? { ...imageItem, is_logo_plate: true } : null);
+  applyTickerForCompany(companyId);
+
+  if (videoItems.length) {
+    mediaQueue = videoItems;
+    mediaIdx = 0;
+    playCurrentMedia();
+  }
+
+  return true;
 }
 
 function buildNormalMediaQueue() {
@@ -342,30 +459,20 @@ async function loadMediaQueue() {
 
 async function switchToCompanyContent(companyId) {
   if (!companyId) return;
+  const cachedCompanyItems = getCompanyTaggedMediaItems(companyId);
+  const switchedFromCache = startCompanyContentFromItems(companyId, cachedCompanyItems);
+
   try {
     const all = await apiPublicFetch('/contents?company_id=' + companyId, { method: 'GET' });
     if (!Array.isArray(all)) return;
-    const items = getHealthyMediaItems(normalizeMediaItems(all));
-    const imageItem = items.find((item) => item.type === 'image') || null;
-    const videoItems = items.filter((item) => item.type === 'video');
+    const items = normalizeMediaItems(all);
 
     if (items.length === 0) return; // no company content — keep current
 
-    if (!isCompanyMode) {
-      normalMediaQueue = buildNormalMediaQueue();
-    }
-
-    isCompanyMode = true;
-    currentCompanyId = companyId;
-    setVisitorCardMedia(imageItem ? { ...imageItem, is_logo_plate: true } : null);
-
-    if (videoItems.length) {
-      mediaQueue = videoItems;
-      mediaIdx = 0;
-      playCurrentMedia();
-    }
+    startCompanyContentFromItems(companyId, items);
   } catch (err) {
     console.warn('[Lobi] Sirket icerik yuklenemedi:', err.message);
+    if (!switchedFromCache) return;
   }
 }
 
@@ -376,7 +483,7 @@ function getHostMediaCompanyId(context) {
 }
 
 function applyHostMediaContext(context) {
-  const companyId = getHostMediaCompanyId(context);
+  const companyId = resolveContentCompanyId(context);
   if (!companyId) {
     activeHostMediaContext = null;
     if (!activeVisitor) revertToNormalContent();
@@ -394,6 +501,7 @@ function revertToNormalContent() {
   isCompanyMode = false;
   currentCompanyId = null;
   setVisitorCardMedia(null);
+  refreshVisibleTicker();
   stopMediaTimer();
   normalMediaQueue = buildNormalMediaQueue();
 
@@ -417,6 +525,7 @@ function playCurrentMedia() {
   const player = $('lb-video-player');
   if (!player) return;
   stopMediaTimer();
+  refreshVisibleTicker();
 
   player.innerHTML = '';
   hideMediaPlaceholder();
@@ -469,9 +578,10 @@ function playNextMedia() {
 
 async function loadSettings() {
   try {
-    const data = await apiPublicFetch('/screen/current', { method: 'GET' });
+    const data = await apiPublicFetch(screenCurrentPath(), { method: 'GET' });
     if (!data || !data.settings) return;
     const s = data.settings;
+    lobbySettingsCache = s || {};
     const nextDefaultCompanyId = data.company?.id ? Number(data.company.id) : null;
     const shouldRefreshMedia = !isCompanyMode && nextDefaultCompanyId !== defaultCompanyId;
     defaultCompanyId = nextDefaultCompanyId;
@@ -494,13 +604,7 @@ async function loadSettings() {
     }
 
     // Ticker mesajları
-    const tickerEl = $('lb-ticker-inner');
-    if (tickerEl) {
-      const msgs = (s.ticker_text || '').split('|').map(m => m.trim()).filter(Boolean);
-      tickerEl.innerHTML = msgs.map(m =>
-        `<span class="lb-ticker-item">${safeEsc(m)}</span>`
-      ).join('');
-    }
+    refreshVisibleTicker();
 
     applyScreenState(data);
     if (!data.host_media && !data.visitor && shouldRefreshMedia) loadMediaQueue();
@@ -514,14 +618,38 @@ async function loadSettings() {
 let overlayTimer = null;
 let activeVisitor = null;
 let lobbyAudioCtx = null;
-let lastOverlayBellVisitorId = null;
+let lobbyAudioUnlocked = false;
+let lobbyAudioUnlockAttempted = false;
+let pendingDoorbellCount = 0;
+let lastOverlayBellCardKey = null;
+let precisePendingSyncTimer = null;
+let dismissedVisitorActivationCutoff = 0;
 
-function playLobbyDoorbell() {
+function flushPendingDoorbells() {
+  const count = pendingDoorbellCount;
+  pendingDoorbellCount = 0;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => playLobbyDoorbell({ queueIfLocked: false }), i * 900);
+  }
+}
+
+function playLobbyDoorbell(options) {
   try {
+    const opts = options || {};
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
+    if (!lobbyAudioUnlocked) {
+      if (opts.queueIfLocked !== false) {
+        pendingDoorbellCount += 1;
+        debugLog('doorbell queued until user gesture', { pendingDoorbellCount });
+      }
+      return;
+    }
     const ctx = lobbyAudioCtx || (lobbyAudioCtx = new AudioCtx());
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+      if (ctx.state === 'suspended') return;
+    }
     const playTone = (frequency, startOffset, duration, volume) => {
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -542,9 +670,53 @@ function playLobbyDoorbell() {
   }
 }
 
-document.addEventListener('click', () => {
-  if (lobbyAudioCtx && lobbyAudioCtx.state === 'suspended') lobbyAudioCtx.resume();
-}, { once: true });
+function unlockLobbyAudio(options) {
+  const opts = options || {};
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  try {
+    lobbyAudioUnlockAttempted = true;
+    const ctx = lobbyAudioCtx || (lobbyAudioCtx = new AudioCtx());
+    const markUnlocked = () => {
+      lobbyAudioUnlocked = true;
+      debugLog('audio unlocked', { state: ctx.state, auto: Boolean(opts.auto) });
+      flushPendingDoorbells();
+    };
+
+    if (ctx.state === 'running') {
+      markUnlocked();
+      return;
+    }
+
+    const resumeResult = ctx.resume();
+    if (resumeResult && typeof resumeResult.then === 'function') {
+      resumeResult
+        .then(() => {
+          if (ctx.state === 'running') markUnlocked();
+          else debugLog('audio unlock still suspended', { state: ctx.state, auto: Boolean(opts.auto) });
+        })
+        .catch((err) => {
+          debugLog('audio unlock blocked', { auto: Boolean(opts.auto), message: err && err.message });
+        });
+      return;
+    }
+
+    if (ctx.state === 'running') markUnlocked();
+  } catch (_) {
+    // no-op
+  }
+}
+
+['click', 'pointerdown', 'keydown'].forEach((eventName) => {
+  document.addEventListener(eventName, () => unlockLobbyAudio({ auto: false }), { once: true });
+});
+
+window.addEventListener('load', () => {
+  unlockLobbyAudio({ auto: true });
+  setTimeout(() => {
+    if (!lobbyAudioUnlocked && !lobbyAudioUnlockAttempted) unlockLobbyAudio({ auto: true });
+  }, 1500);
+});
 
 function applyAdaptiveLogoPlate(imgEl, wrapEl) {
   if (!imgEl) return;
@@ -553,6 +725,14 @@ function applyAdaptiveLogoPlate(imgEl, wrapEl) {
 
   const markReady = () => {
     try {
+      if (wrapEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+        const rawRatio = imgEl.naturalWidth / imgEl.naturalHeight;
+        const plateRatio = Math.max(0.95, Math.min(3.2, rawRatio));
+        const plateWidth = Math.max(180, Math.min(340, Math.round(132 * plateRatio) + 56));
+        wrapEl.style.setProperty('--logo-plate-aspect', String(plateRatio));
+        wrapEl.style.setProperty('--logo-plate-w', plateWidth + 'px');
+      }
+
       const canvas = document.createElement('canvas');
       const size = 24;
       canvas.width = size;
@@ -566,16 +746,34 @@ function applyAdaptiveLogoPlate(imgEl, wrapEl) {
       const imageData = ctx.getImageData(0, 0, size, size).data;
       let visiblePixels = 0;
       let brightPixels = 0;
+      let redTotal = 0;
+      let greenTotal = 0;
+      let blueTotal = 0;
 
       for (let i = 0; i < imageData.length; i += 4) {
         const alpha = imageData[i + 3];
         if (alpha < 24) continue;
         visiblePixels += 1;
-        const luminance = (0.2126 * imageData[i]) + (0.7152 * imageData[i + 1]) + (0.0722 * imageData[i + 2]);
+        const red = imageData[i];
+        const green = imageData[i + 1];
+        const blue = imageData[i + 2];
+        redTotal += red;
+        greenTotal += green;
+        blueTotal += blue;
+        const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
         if (luminance >= 176) brightPixels += 1;
       }
 
       if (!visiblePixels) return;
+      if (wrapEl) {
+        const avgRed = Math.round(redTotal / visiblePixels);
+        const avgGreen = Math.round(greenTotal / visiblePixels);
+        const avgBlue = Math.round(blueTotal / visiblePixels);
+        wrapEl.style.setProperty('--logo-r', String(avgRed));
+        wrapEl.style.setProperty('--logo-g', String(avgGreen));
+        wrapEl.style.setProperty('--logo-b', String(avgBlue));
+        wrapEl.style.setProperty('--logo-rgb', `${avgRed}, ${avgGreen}, ${avgBlue}`);
+      }
       if ((brightPixels / visiblePixels) >= 0.52) {
         targets.forEach((el) => el.classList.add('is-light-logo'));
       }
@@ -595,8 +793,12 @@ function applyAdaptiveLogoPlate(imgEl, wrapEl) {
 function showVisitorOverlay(visitor) {
   const overlay = $('lb-visitor-overlay');
   if (!overlay) return;
-  const nextVisitorId = visitor && visitor.id != null ? Number(visitor.id) : null;
-  const shouldRingBell = nextVisitorId !== null && nextVisitorId !== lastOverlayBellVisitorId;
+  const nextCardKey = visitor ? [
+    visitor.source || 'visitor',
+    visitor.id != null ? visitor.id : 'new',
+    visitor.activated_at || visitor.arrival_time || visitor.planned_time || visitor.created_at || '',
+  ].join(':') : null;
+  const shouldRingBell = nextCardKey && nextCardKey !== lastOverlayBellCardKey;
   activeVisitor = visitor || null;
   const fallbackLogoItem = getCompanyTaggedImage(visitor.host_company_id);
   const hostLogoSrc = visitor.host_company_logo || fallbackLogoItem?.src || '';
@@ -628,14 +830,14 @@ function showVisitorOverlay(visitor) {
 
   overlay.classList.remove('screen-hide');
   if (shouldRingBell) {
-    playLobbyDoorbell();
-    lastOverlayBellVisitorId = nextVisitorId;
+    playLobbyDoorbell({ queueIfLocked: true });
+    lastOverlayBellCardKey = nextCardKey;
   }
 
   // Switch to company-specific content
   if (visitor.host_company_id) {
     applyHostMediaContext({
-      source: 'visitor',
+      source: visitor.source || 'visitor',
       id: visitor.id,
       full_name: visitor.full_name,
       planned_time: visitor.planned_time || null,
@@ -652,8 +854,12 @@ function hideVisitorOverlay(options) {
   const overlay = $('lb-visitor-overlay');
   if (overlay) overlay.classList.add('screen-hide');
   if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+  if (!opts.preserveHostMedia && precisePendingSyncTimer) {
+    clearTimeout(precisePendingSyncTimer);
+    precisePendingSyncTimer = null;
+  }
   activeVisitor = null;
-  lastOverlayBellVisitorId = null;
+  lastOverlayBellCardKey = null;
   if (!opts.preserveHostMedia) {
     activeHostMediaContext = null;
     setVisitorCardMedia(null);
@@ -665,15 +871,103 @@ function getPayloadVisitor(payload) {
   return payload && typeof payload === 'object' ? payload.visitor || null : null;
 }
 
+function parseTimeMs(value) {
+  if (!value) return 0;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function getVisitorActivationMs(visitor) {
+  if (!visitor) return 0;
+  return parseTimeMs(visitor.arrival_time)
+    || parseTimeMs(visitor.planned_time)
+    || parseTimeMs(visitor.created_at);
+}
+
+function getHostMediaActivationMs(hostMedia) {
+  if (!hostMedia) return 0;
+  return parseTimeMs(hostMedia.activated_at)
+    || parseTimeMs(hostMedia.arrival_time)
+    || parseTimeMs(hostMedia.planned_time);
+}
+
+function isHostMediaDue(hostMedia) {
+  const activationMs = getHostMediaActivationMs(hostMedia);
+  return activationMs > 0 && activationMs <= Date.now() + 1000;
+}
+
+function hostMediaToOverlayVisitor(hostMedia) {
+  if (!hostMedia || !isHostMediaDue(hostMedia)) return null;
+  if (hostMedia.source !== 'appointment' && hostMedia.source !== 'visitor') return null;
+  return {
+    source: hostMedia.source,
+    id: hostMedia.id,
+    full_name: hostMedia.full_name,
+    company_name: hostMedia.company_name || '',
+    status: hostMedia.source === 'appointment' ? 'planned' : 'waiting',
+    is_screen_active: hostMedia.source === 'visitor' ? 1 : 0,
+    planned_time: hostMedia.planned_time || null,
+    arrival_time: hostMedia.arrival_time || null,
+    created_at: hostMedia.activated_at || hostMedia.planned_time || null,
+    host_name: hostMedia.host_name || null,
+    host_company_id: hostMedia.host_company_id || null,
+    host_company_name: hostMedia.host_company_name || null,
+    host_company_logo: hostMedia.host_company_logo || null,
+  };
+}
+
 function getPayloadCompanyId(payload) {
   const visitor = getPayloadVisitor(payload);
   if (visitor && visitor.host_company_id != null) return Number(visitor.host_company_id);
+  const appointment = payload && typeof payload === 'object' ? payload.appointment || null : null;
+  if (appointment && appointment.host_company_id != null) return Number(appointment.host_company_id);
   if (payload && payload.host_company_id != null) return Number(payload.host_company_id);
   return null;
 }
 
+function getPayloadHostMediaContext(payload) {
+  const visitor = getPayloadVisitor(payload);
+  if (visitor && visitor.host_company_id != null) {
+    return {
+      source: 'visitor',
+      id: visitor.id,
+      full_name: visitor.full_name,
+      planned_time: visitor.planned_time || null,
+      arrival_time: visitor.arrival_time || null,
+      host_company_id: visitor.host_company_id,
+      host_company_name: visitor.host_company_name || null,
+      host_company_logo: visitor.host_company_logo || null,
+    };
+  }
+
+  const appointment = payload && typeof payload === 'object' ? payload.appointment || null : null;
+  if (appointment && appointment.host_company_id != null) {
+    return {
+      source: 'appointment',
+      id: appointment.id,
+      full_name: appointment.visitor_name,
+      planned_time: appointment.planned_time || null,
+      arrival_time: null,
+      host_company_id: appointment.host_company_id,
+      host_company_name: appointment.host_company_name || null,
+      host_company_logo: appointment.host_company_logo || null,
+    };
+  }
+
+  const companyId = getPayloadCompanyId(payload);
+  return companyId ? { host_company_id: companyId } : null;
+}
+
+function applyPayloadHostMediaImmediately(payload) {
+  const context = getPayloadHostMediaContext(payload);
+  if (context && getHostMediaCompanyId(context)) applyHostMediaContext(context);
+}
+
 function shouldHandleVisitorPayload(payload) {
-  return Boolean(getPayloadVisitor(payload));
+  const visitor = getPayloadVisitor(payload);
+  if (!visitor) return false;
+  const activationMs = getVisitorActivationMs(visitor);
+  return !activationMs || activationMs > dismissedVisitorActivationCutoff;
 }
 
 function shouldHideForPayload(payload) {
@@ -693,7 +987,13 @@ function safeSocketHandler(label, handler) {
 
 async function syncVisitorOverlayWithServer(fallbackPayload) {
   try {
-    const data = await apiPublicFetch('/screen/current', { method: 'GET' });
+    const data = await apiPublicFetch(screenCurrentPath(), { method: 'GET' });
+    debugLog('syncVisitorOverlayWithServer:response', {
+      fallbackPayload,
+      visitor: data && data.visitor,
+      host_media: data && data.host_media,
+      server_debug: data && data.debug,
+    });
     if (data) {
       applyScreenState(data, fallbackPayload);
       return;
@@ -712,35 +1012,82 @@ async function syncVisitorOverlayWithServer(fallbackPayload) {
 }
 
 function applyScreenState(data, fallbackPayload) {
+  schedulePrecisePendingSync(data);
   const visitor = data && data.visitor ? data.visitor : null;
   const hostMedia = data && data.host_media ? data.host_media : null;
+  const hostMediaActivationMs = getHostMediaActivationMs(hostMedia);
+  debugLog('applyScreenState:start', {
+    visitor,
+    hostMedia,
+    fallbackPayload,
+    hostMediaActivationMs,
+    dismissedVisitorActivationCutoff,
+    serverDebug: data && data.debug,
+  });
+
+  if (!visitor && hostMediaActivationMs > dismissedVisitorActivationCutoff) {
+    dismissedVisitorActivationCutoff = hostMediaActivationMs;
+    debugLog('dismissed cutoff updated', { dismissedVisitorActivationCutoff });
+  }
 
   if (visitor && shouldHandleVisitorPayload({ visitor })) {
+    debugLog('decision:show visitor overlay', visitor);
     showVisitorOverlay(visitor);
     return;
   }
 
   if (fallbackPayload && fallbackPayload.visitor && shouldHandleVisitorPayload(fallbackPayload)) {
+    debugLog('decision:show fallback visitor overlay', fallbackPayload.visitor);
     showVisitorOverlay(fallbackPayload.visitor);
     return;
   }
 
+  const hostMediaVisitor = hostMediaToOverlayVisitor(hostMedia);
+  if (hostMediaVisitor) {
+    debugLog('decision:show host_media overlay', hostMediaVisitor);
+    showVisitorOverlay(hostMediaVisitor);
+    return;
+  }
+
   if (hostMedia && getHostMediaCompanyId(hostMedia)) {
+    debugLog('decision:host media only', hostMedia);
     hideVisitorOverlay({ preserveHostMedia: true });
     applyHostMediaContext(hostMedia);
     return;
   }
 
+  debugLog('decision:hide overlay');
   hideVisitorOverlay();
 }
 
 async function syncHostMediaWithServer() {
   try {
-    const data = await apiPublicFetch('/screen/current', { method: 'GET' });
+    const data = await apiPublicFetch(screenCurrentPath(), { method: 'GET' });
+    debugLog('syncHostMediaWithServer:response', {
+      visitor: data && data.visitor,
+      host_media: data && data.host_media,
+      server_debug: data && data.debug,
+    });
     applyScreenState(data);
   } catch (err) {
     console.warn('[Lobi] Host medyasi senkronize edilemedi:', err.message);
   }
+}
+
+function schedulePrecisePendingSync(data) {
+  if (precisePendingSyncTimer) {
+    clearTimeout(precisePendingSyncTimer);
+    precisePendingSyncTimer = null;
+  }
+  if (!data || !data.host_media || !data.host_media.planned_time) return;
+  if (data.visitor && data.visitor.is_screen_active) return;
+  const dueAt = new Date(data.host_media.planned_time).getTime();
+  if (!Number.isFinite(dueAt)) return;
+  const msUntilDue = dueAt - Date.now();
+  if (msUntilDue <= 0 || msUntilDue > 10 * 60 * 1000) return;
+  precisePendingSyncTimer = setTimeout(() => {
+    syncHostMediaWithServer();
+  }, msUntilDue + 500);
 }
 
 // ═══════════════════ SOCKET ═══════════════════
@@ -758,6 +1105,7 @@ const socket = vdCreateSocket({
   handlers: {
     'screen:update': safeSocketHandler('screen:update', (d) => {
       if ((d.action === 'arrived' || d.action === 'approved') && d.visitor && shouldHandleVisitorPayload(d)) {
+        applyPayloadHostMediaImmediately(d);
         syncVisitorOverlayWithServer(d);
       } else if ((d.action === 'checkout' || d.action === 'left' || d.action === 'cancel') && shouldHideForPayload(d)) {
         syncHostMediaWithServer();
@@ -765,11 +1113,13 @@ const socket = vdCreateSocket({
     }),
     'visitor:approved': safeSocketHandler('visitor:approved', (d) => {
       if (d && d.visitor && shouldHandleVisitorPayload(d)) {
+        applyPayloadHostMediaImmediately(d);
         syncVisitorOverlayWithServer(d);
       }
     }),
     'visitor:arrived': safeSocketHandler('visitor:arrived', (d) => {
       if (d && d.visitor && shouldHandleVisitorPayload(d)) {
+        applyPayloadHostMediaImmediately(d);
         syncVisitorOverlayWithServer(d);
       }
     }),
@@ -779,11 +1129,20 @@ const socket = vdCreateSocket({
     'visitor:cancelled': safeSocketHandler('visitor:cancelled', (d) => {
       syncHostMediaWithServer();
     }),
-    'visitor:waiting': safeSocketHandler('visitor:waiting', () => syncHostMediaWithServer()),
+    'visitor:waiting': safeSocketHandler('visitor:waiting', (d) => {
+      applyPayloadHostMediaImmediately(d);
+      syncHostMediaWithServer();
+    }),
     'visitor:deleted': safeSocketHandler('visitor:deleted', () => syncHostMediaWithServer()),
-    'appointment:created': safeSocketHandler('appointment:created', () => syncHostMediaWithServer()),
-    'appointment:updated': safeSocketHandler('appointment:updated', () => syncHostMediaWithServer()),
-    'appointment:approved': safeSocketHandler('appointment:approved', () => syncHostMediaWithServer()),
+    'appointment:created': safeSocketHandler('appointment:created', () => {
+      syncHostMediaWithServer();
+    }),
+    'appointment:updated': safeSocketHandler('appointment:updated', () => {
+      syncHostMediaWithServer();
+    }),
+    'appointment:approved': safeSocketHandler('appointment:approved', () => {
+      syncHostMediaWithServer();
+    }),
     'appointment:cancelled': safeSocketHandler('appointment:cancelled', () => syncHostMediaWithServer()),
     'appointment:deleted': safeSocketHandler('appointment:deleted', () => syncHostMediaWithServer()),
     'content:updated': safeSocketHandler('content:updated', () => loadMediaQueue()),
@@ -837,7 +1196,7 @@ window.lobiToggleFullscreen = lobiToggleFullscreen;
   // Periyodik yenilemeler
   setInterval(loadWeather,    15 * 60 * 1000); // 15 dk
   setInterval(loadMediaQueue,  5 * 60 * 1000); // 5 dk
-  setInterval(syncHostMediaWithServer, 30 * 1000); // host videosu icin yakin randevu kontrolu
+  setInterval(syncHostMediaWithServer, 10 * 1000); // yakin randevu / pending kart kontrolu
   setInterval(loadSettings,   10 * 60 * 1000); // 10 dk
   setInterval(loadNews,       30 * 60 * 1000); // 30 dk (RSS cache ile uyumlu)
   setInterval(renderNews,     12 * 1000);       // 12 sn'de bir haberler kaydır

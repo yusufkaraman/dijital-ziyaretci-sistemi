@@ -142,13 +142,19 @@ function updatePreview() {
 }
 
 async function loadRecentCheckins() {
-  const list = await api.getVisitors({ date: 'today', status: 'inside' });
   const el = document.getElementById('recent-checkins-list');
-  el.innerHTML = list.slice(0, 5).map(v => `
-    <div class="visitor-row" style="padding:10px 0;cursor:pointer" onclick="showVisitorDetail(${v.id})">
-      <div class="visitor-avatar" style="width:28px;height:28px;font-size:11px">${esc(v.full_name)[0]}</div>
-      <div class="visitor-info"><div style="font-size:13px;font-weight:500">${esc(v.full_name)}</div><div style="font-size:11px;color:var(--text-muted)">${visitorTimeSummary(v)}</div></div>
-    </div>`).join('') || '<div class="empty-state" style="font-size:12px">Henüz giriş yok</div>';
+  if (!el) return;
+  const list = await api.getAppointments({ date: 'today', status: 'planned' });
+  list.sort((a, b) => new Date(a.planned_time) - new Date(b.planned_time));
+  el.innerHTML = list.slice(0, 6).map(a => `
+    <div class="visitor-row" style="padding:10px 0;gap:10px">
+      <div class="visitor-avatar" style="width:28px;height:28px;font-size:11px;background:linear-gradient(135deg,#10b981,#059669)">${esc(a.visitor_name)[0]}</div>
+      <div class="visitor-info" style="cursor:pointer" onclick="showAppointmentDetail(${a.id})">
+        <div style="font-size:13px;font-weight:600">${esc(a.visitor_name)}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${formatTime(a.planned_time)} · ${esc(a.host_name) || '—'}</div>
+      </div>
+      <button class="btn-primary" style="font-size:11px;padding:6px 9px;background:#10b981;border-color:#10b981;white-space:nowrap" onclick='withButtonLock(this, function(){ return quickCompleteAppointment(${a.id}, ${JSON.stringify(a.visitor_name).replace(/'/g, "\\'")}) })'>Geldi Gitti</button>
+    </div>`).join('') || '<div class="empty-state" style="font-size:12px">Bugün açık randevu yok</div>';
 }
 
 async function checkBlacklist(tc) {

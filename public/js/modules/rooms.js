@@ -7,6 +7,46 @@ function closeModal() {
   return window.vdCloseModal();
 }
 
+function formatRoomTime(value) {
+  return new Date(value).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderRoomReservationList(room) {
+  const reservations = room.reservations || [];
+  if (!reservations.length) return '<div class="empty-state" style="padding:18px;text-align:center">Bugün rezervasyon yok.</div>';
+  return reservations.map((res) => `
+    <div class="visitor-row" style="margin-bottom:8px">
+      <div class="visitor-info">
+        <div class="visitor-name">${esc(res.title || 'Rezervasyon')}</div>
+        <div class="visitor-meta">${formatRoomTime(res.start_time)} - ${formatRoomTime(res.end_time)}${res.user_name ? ' · ' + esc(res.user_name) : ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function showRoomDetail(id) {
+  const rooms = await api.getRooms();
+  const room = rooms.find((r) => Number(r.id) === Number(id));
+  if (!room) return showToast('Oda bulunamadı', 'error');
+  showModal(esc(room.name), `
+    <div style="display:grid;gap:14px">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Kapasite</div><div>${esc(String(room.capacity || 0))} Kişi</div></div>
+        <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Durum</div><span class="status-badge status-inside">${room.is_active === false ? 'Pasif' : 'Aktif'}</span></div>
+      </div>
+      <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Ekipman</div><div>${esc(room.equipment || 'Ekipman yok')}</div></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:8px">Bugünkü Rezervasyonlar</div>
+        ${renderRoomReservationList(room)}
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+        <button class="btn-secondary" onclick="closeModal()">Kapat</button>
+        <button class="btn-primary" onclick="closeModal();showRoomReservationFor(${room.id})">Rezervasyon Yap</button>
+      </div>
+    </div>
+  `);
+}
+
 async function loadRooms() {
   try {
     const rooms = await api.getRooms();
@@ -18,17 +58,17 @@ async function loadRooms() {
       const activeRes = (r.reservations || []).map(res => `
         <div style="font-size:12px;background:rgba(245,158,11,0.1);color:#d97706;padding:4px 8px;border-radius:4px;margin-bottom:4px;display:flex;justify-content:space-between;">
            <span>🕒 ${new Date(res.start_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} - ${new Date(res.end_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} | ${esc(res.title)}</span>
-           ${u && window.vdPermissions && window.vdPermissions.canCancelReservation(u, res.user_id) ? `<button style="background:none;border:none;color:red;cursor:pointer;font-size:10px" onclick="cancelReservation(${res.id})">İptal</button>`:''}
+           ${u && window.vdPermissions && window.vdPermissions.canCancelReservation(u, res.user_id) ? `<button style="background:none;border:none;color:red;cursor:pointer;font-size:10px" onclick="event.stopPropagation();cancelReservation(${res.id})">İptal</button>`:''}
         </div>
       `).join('');
 
       return `
-      <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer" onclick="showRoomDetail(${r.id})">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div style="font-weight:800;font-size:15px;color:var(--text)">${esc(r.name)}</div>
           <div style="display:flex;gap:4px">
              <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.1);color:#10b981;font-weight:700">👥 ${r.capacity} Kişi</span>
-             <button class="btn-primary" style="font-size:10px;padding:3px 8px;border-radius:6px;" onclick="showRoomReservationFor(${r.id})">Rezerve Et</button>
+             <button class="btn-primary" style="font-size:10px;padding:3px 8px;border-radius:6px;" onclick="event.stopPropagation();showRoomReservationFor(${r.id})">Rezerve Et</button>
           </div>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">🔧 ${esc(r.equipment) || 'Ekipman yok'}</div>
@@ -84,6 +124,10 @@ async function showRoomReservationFor(forceId) {
   } catch (e) { showToast('Odalar yüklenirken hata oluştu', 'error'); }
 }
 
+function showRoomReservation() {
+  return showRoomReservationFor(null);
+}
+
 let _roomResBusy = false;
 async function submitRoomReservation() {
   if (_roomResBusy) return;
@@ -118,4 +162,10 @@ async function cancelReservation(id) {
     loadRooms();
   } catch(e) { showToast(e.message, 'error'); }
 }
+
+window.showRoomReservation = showRoomReservation;
+window.showRoomReservationFor = showRoomReservationFor;
+window.showRoomDetail = showRoomDetail;
+window.submitRoomReservation = submitRoomReservation;
+window.cancelReservation = cancelReservation;
 

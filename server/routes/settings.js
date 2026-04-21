@@ -3,7 +3,7 @@ const prisma = require('../prisma');
 const auth = require('../middleware/auth');
 const { canManageSettings } = require('../policies/permissions');
 const router = express.Router();
-const SECRETARY_ALLOWED_SETTINGS = new Set(['ticker_text']);
+const SECRETARY_ALLOWED_SETTINGS = new Set(['ticker_text', 'ticker_speed', 'ticker_company_texts']);
 
 function canUpdateRequestedSettings(role, updates) {
   if (canManageSettings(role)) return true;
