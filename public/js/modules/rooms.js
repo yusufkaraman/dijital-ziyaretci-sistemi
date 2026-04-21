@@ -17,7 +17,7 @@ async function loadRooms() {
     grid.innerHTML = rooms.map(r => {
       const activeRes = (r.reservations || []).map(res => `
         <div style="font-size:12px;background:rgba(245,158,11,0.1);color:#d97706;padding:4px 8px;border-radius:4px;margin-bottom:4px;display:flex;justify-content:space-between;">
-           <span>🕒 ${new Date(res.start_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} - ${new Date(res.end_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} | ${res.title}</span>
+           <span>🕒 ${new Date(res.start_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} - ${new Date(res.end_time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} | ${esc(res.title)}</span>
            ${u && window.vdPermissions && window.vdPermissions.canCancelReservation(u, res.user_id) ? `<button style="background:none;border:none;color:red;cursor:pointer;font-size:10px" onclick="cancelReservation(${res.id})">İptal</button>`:''}
         </div>
       `).join('');
@@ -25,13 +25,13 @@ async function loadRooms() {
       return `
       <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="font-weight:800;font-size:15px;color:var(--text)">${r.name}</div>
+          <div style="font-weight:800;font-size:15px;color:var(--text)">${esc(r.name)}</div>
           <div style="display:flex;gap:4px">
              <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.1);color:#10b981;font-weight:700">👥 ${r.capacity} Kişi</span>
              <button class="btn-primary" style="font-size:10px;padding:3px 8px;border-radius:6px;" onclick="showRoomReservationFor(${r.id})">Rezerve Et</button>
           </div>
         </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">🔧 ${r.equipment || 'Ekipman yok'}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">🔧 ${esc(r.equipment) || 'Ekipman yok'}</div>
         <div style="margin-top:12px;">
           <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;text-transform:uppercase;">Bugünkü Rezervasyonlar</div>
           ${activeRes || '<div style="font-size:12px;color:var(--text-muted)">Planlanmış rezervasyon yok.</div>'}
@@ -52,7 +52,7 @@ async function showRoomReservationFor(forceId) {
           <label style="font-size:12px;font-weight:700">Toplantı Odası *</label>
           <select id="res-room" class="form-input" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border)">
             <option value="">Seçiniz...</option>
-            ${rooms.map(r => `<option value="${r.id}" ${forceId === r.id ? 'selected':''}>${r.name} (${r.capacity} Kişi)</option>`).join('')}
+            ${rooms.map(r => `<option value="${r.id}" ${forceId === r.id ? 'selected':''}>${esc(r.name)} (${r.capacity} Kişi)</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -84,7 +84,14 @@ async function showRoomReservationFor(forceId) {
   } catch (e) { showToast('Odalar yüklenirken hata oluştu', 'error'); }
 }
 
+let _roomResBusy = false;
 async function submitRoomReservation() {
+  if (_roomResBusy) return;
+  _roomResBusy = true;
+  try { await _doSubmitRoomReservation(); } finally { _roomResBusy = false; }
+}
+
+async function _doSubmitRoomReservation() {
   const roomId = document.getElementById('res-room').value;
   const title = document.getElementById('res-title').value.trim();
   const date = document.getElementById('res-date').value;

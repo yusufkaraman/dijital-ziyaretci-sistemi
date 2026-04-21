@@ -1,105 +1,163 @@
 <!DOCTYPE html>
 <html lang="tr">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bıkmaz Grup Lobi Ekranı</title>
-  <meta name="description" content="Dijital Ziyaretçi Karşılama Lobi Ekranı" />
+  <title>Dijital Ziyaretci — Lobi Ekrani</title>
+  <meta name="description" content="Dijital Ziyaretci Karsilama Lobi Ekrani" />
   <link rel="icon" type="image/png" href="/favicon.ico" />
-  <link rel="apple-touch-icon" href="/favicon.ico" />
   <link rel="stylesheet" href="/fonts/noto-sans.css" />
-  
-  <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/lobi.css" />
 </head>
 
 <body>
 
-  <div class="bg-layer"></div>
-  <div class="bg-media-layer" id="bg-media"></div>
-  <div class="bg-overlay" id="bg-overlay"></div>
-  <div class="particles" id="particles"></div>
+  <!-- ARKA PLAN PARTİKÜLLER -->
+  <div class="lb-particles" id="lb-particles"></div>
 
-  <div id="app-shell">
+  <!-- ANA KABUK -->
+  <div class="lb-shell" id="lb-shell">
 
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <div class="logo-area">
-      <img id="company-logo-img" class="company-logo-img" alt="Company Logo" />
-      <div class="logo-icon">
-        <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-          <rect x="2" y="2" width="10" height="10" rx="2" fill="white" opacity="0.9" />
-          <rect x="16" y="2" width="10" height="10" rx="2" fill="white" opacity="0.6" />
-          <rect x="2" y="16" width="10" height="10" rx="2" fill="white" opacity="0.6" />
-          <rect x="16" y="16" width="10" height="10" rx="2" fill="white" opacity="0.9" />
-        </svg>
+    <!-- ════════ SOL BÖLGE ════════ -->
+    <section class="lb-left" id="lb-left">
+
+      <!-- Logo Bandı -->
+      <div class="lb-logo-bar">
+        <div class="lb-logo-wrap">
+          <!-- Beyaz kutucuk içinde favicon/logo -->
+          <div class="lb-logo-box">
+            <img src="/Assets/sitelogo.png" alt="Logo" class="lb-logo-img" id="lb-logo-img" />
+          </div>
+          <div class="lb-brand-texts">
+            <span class="lb-brand-name" id="lb-brand-name"></span>
+            <span class="lb-brand-sub">Dijital Ziyaretçi Sistemi</span>
+          </div>
+        </div>
+        <div class="lb-conn-status">
+          <div class="lb-conn-dot" id="lb-conn-dot"></div>
+        </div>
       </div>
-    </div>
-    <div class="conn-status">
-      <div class="conn-dot" id="conn-dot"></div>
-      <span id="conn-label">Bağlanıyor...</span>
-    </div>
-    <div class="clock-area">
-      <div class="clock-time" id="clock-time">00:00:00</div>
-      <div class="clock-date" id="clock-date"></div>
-    </div>
-  </header>
 
-  <!-- ANA İÇERİK -->
-  <main class="main lobi-main">
+      <!-- Video / Görsel Oynatıcı -->
+      <div class="lb-video-wrap" id="lb-video-wrap">
+        <div class="lb-video-player" id="lb-video-player">
+          <div class="lb-video-placeholder" id="lb-video-placeholder">
+            <div class="lb-placeholder-icon">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+            </div>
+            <div class="lb-placeholder-text">İçerik Yükleniyor...</div>
+          </div>
+        </div>
 
-    <!-- İçerik Ekranı (video / görsel) -->
-    <div id="content-screen">
-      <div id="content-media"></div>
-      <div class="content-overlay">
-        <div class="content-title" id="content-title"></div>
+        <!-- Video üstü hoşgeldiniz bandı -->
+        <div class="lb-welcome-bar">
+          <div class="lb-welcome-bar-title" id="lb-welcome-bar-title"></div>
+          <div class="lb-welcome-bar-sub" id="lb-welcome-bar-sub"></div>
+        </div>
       </div>
-    </div>
 
-    <!-- Hoş Geldiniz Ekranı (ziyaretçi varken) -->
-    <div id="welcome-screen" class="screen-transition screen-hide">
-      <div class="welcome-label">HOŞ GELDİNİZ</div>
-      <div class="welcome-name" id="welcome-name">—</div>
-      <div class="welcome-divider"></div>
-      <div class="host-label">Görüşeceğiniz Kişi</div>
-      <div class="welcome-host" id="welcome-host">—</div>
-      <div class="host-label" style="margin-top:12px">Görüşeceğiniz Kişinin Şirketi</div>
-      <div class="welcome-host-company" id="welcome-host-company">—</div>
-    </div>
-
-    <!-- Default Ekran (ziyaretçi yokken) -->
-    <div id="default-screen" class="screen-transition with-bg" style="background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);padding:50px 100px;border-radius:48px;border:1px solid rgba(255,255,255,0.6);box-shadow:0 40px 100px rgba(0,0,0,0.15);width:fit-content;max-width:90vw;min-width:min(650px,92vw);margin:auto;">
-      <div class="default-title">Hoş <span>Geldiniz</span></div>
-      <div class="default-sub">Lütfen resepsiyona başvurunuz</div>
-    </div>
-
-  </main>
-
-  <!-- FOOTER ticker -->
-  <footer class="lobi-footer">
-    <span>📡 Bıkmazdesk</span>
-    <div class="lobi-ticker">
-      <div class="ticker-inner" id="ticker">
-        <span class="ticker-item">👋 Ziyaretiniz için teşekkür ederiz</span>
-        <span class="ticker-item">📋 Lütfen resepsiyona başvurunuz</span>
-        <span class="ticker-item">🔔 Randevunuz için sekreterya ile iletişime geçin</span>
-        <span class="ticker-item">☕ Bekleme alanımızda ikramlıklar mevcuttur</span>
-        <span class="ticker-item">📶 WiFi: Bikmazdesk_Guest | Şifre: Hosgeldiniz</span>
+      <!-- ZİYARETÇİ KARŞILAMA OVERLAY -->
+      <div class="lb-visitor-overlay screen-hide" id="lb-visitor-overlay">
+        <div class="lb-visitor-card" id="lb-visitor-card">
+          <div class="lb-visitor-deco"></div>
+          <!-- Sirket logosu — card üstünde belirgin -->
+          <div class="lb-visitor-logo-wrap" id="lb-visitor-logo-wrap" style="display:none">
+            <img id="lb-visitor-card-logo" src="" alt="" class="lb-visitor-card-logo" />
+          </div>
+          <div class="lb-visitor-hosgeldiniz">HOŞGELDİNİZ</div>
+          <div class="lb-visitor-name" id="lb-visitor-name">—</div>
+          <div class="lb-visitor-company" id="lb-visitor-company"></div>
+          <div class="lb-visitor-divider"></div>
+          <div class="lb-visitor-info-row">
+            <div class="lb-visitor-info-item">
+              <span class="lb-visitor-info-lbl">Görüşeceğiniz Kişi</span>
+              <span class="lb-visitor-info-val" id="lb-visitor-host">—</span>
+            </div>
+            <div class="lb-visitor-info-item">
+              <span class="lb-visitor-info-lbl">Departman / Şirket</span>
+              <div class="lb-visitor-host-company-row">
+                <img id="lb-visitor-host-logo" src="" alt="" class="lb-visitor-host-logo" style="display:none" />
+                <span class="lb-visitor-info-val" id="lb-visitor-host-company">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="lb-visitor-media-wrap" id="lb-visitor-media-wrap" style="display:none">
+            <img id="lb-visitor-card-media" src="" alt="" class="lb-visitor-card-media" />
+          </div>
+          <div class="lb-visitor-invite-badge">
+            İçeri Davet Edildiniz
+          </div>
+        </div>
       </div>
+
+    </section>
+
+    <!-- ════════ SAĞ PANEL ════════ -->
+    <aside class="lb-right-panel" id="lb-right-panel">
+
+      <!-- Sadece Saat -->
+      <div class="lb-clock-section">
+        <div class="lb-clock-time" id="lb-clock-time">00:00</div>
+        <div class="lb-clock-date" id="lb-clock-date">—</div>
+        <div class="lb-clock-day"  id="lb-clock-day">—</div>
+      </div>
+
+      <div class="lb-panel-divider"></div>
+
+      <!-- Hava Durumu (başlıksız) -->
+      <div class="lb-weather-section" id="lb-weather-section">
+        <div class="lb-weather-city" id="lb-weather-city">Ankara</div>
+        <div class="lb-weather-row">
+          <div class="lb-weather-temp" id="lb-weather-temp">—</div>
+          <div class="lb-weather-icon" id="lb-weather-icon">
+            <!-- SVG ikonu JS tarafından atanır -->
+          </div>
+        </div>
+        <div class="lb-weather-cond"  id="lb-weather-cond">Yükleniyor...</div>
+        <div class="lb-weather-extra" id="lb-weather-extra"></div>
+        <div class="lb-weather-forecast" id="lb-weather-forecast"></div>
+      </div>
+
+      <div class="lb-panel-divider"></div>
+
+      <!-- Güncel Haberler -->
+      <div class="lb-news-section">
+        <div class="lb-news-heading">GÜNCEL HABERLER</div>
+        <div class="lb-news-list" id="lb-news-list">
+          <!-- JS tarafından doldurulur -->
+        </div>
+      </div>
+
+    </aside>
+
+  </div><!-- /lb-shell -->
+
+  <!-- ALT KAYAN BANT -->
+  <footer class="lb-ticker-bar">
+    <div class="lb-ticker-brand">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.58 3.47A2 2 0 0 1 3.56 1.34h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.88a16 16 0 0 0 6.06 6.06l.88-.88a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.56 16.56Z"/></svg>
+      <span id="lb-ticker-brand-text">+90 532 743 69 62</span>
     </div>
-    <span id="footer-date"></span>
+    <div class="lb-ticker-track">
+      <div class="lb-ticker-inner" id="lb-ticker-inner"></div>
+    </div>
+    <div class="lb-ticker-date" id="lb-ticker-date"></div>
   </footer>
 
-  </div>
-
-  <button class="rotate-btn" id="rotate-btn" onclick="toggleManualRotate()" title="Ekranı Elle Döndür">↻</button>
-
-  <!-- Fullscreen butonu -->
-  <button class="fs-btn" onclick="toggleFullscreen()" title="Tam Ekran">⛶</button>
+  <!-- Tam Ekran Butonu (sağ alt) -->
+  <button class="lb-fs-btn" id="lb-fs-btn" onclick="lobiToggleFullscreen()" title="Tam Ekran">
+    <svg id="lb-fs-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+    </svg>
+  </button>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/core/auth.js"></script>
+  <script src="/js/core/api.js"></script>
+  <script src="/js/core/formatters.js"></script>
+  <script src="/js/core/socket.js"></script>
   <script src="/js/panels/lobby-screen.js"></script>
 </body>
-
 </html>

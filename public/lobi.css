@@ -1,625 +1,909 @@
-/* === LOBI === */
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    
-
-    /*  */
-
-    #app-shell {
-      position: relative;
-      z-index: 10;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* ANİMASYON ARKA PLAN */
-    .bg-layer {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      background: radial-gradient(ellipse 140% 90% at 20% 0%, rgba(0, 96, 240, 0.18) 0%, transparent 60%),
-        radial-gradient(ellipse 120% 80% at 80% 0%, rgba(11, 42, 78, 0.12) 0%, transparent 65%),
-        linear-gradient(180deg, #ffffff 0%, #eef3ff 100%);
-    }
-
-    .bg-media-layer {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      overflow: hidden;
-      display: none;
-    }
-    
-    .bg-media-layer video, .bg-media-layer img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .bg-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      background: rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(2px);
-      display: none;
-    }
-
-    .particles {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .particle {
-      position: absolute;
-      border-radius: 50%;
-      background: rgba(0, 96, 240, 0.10);
-      animation: float linear infinite;
-    }
-
-    @keyframes float {
-      0% {
-        transform: translateY(110vh) scale(0);
-        opacity: 0
-      }
-
-      10% {
-        opacity: 1
-      }
-
-      90% {
-        opacity: .4
-      }
-
-      100% {
-        transform: translateY(-5vh) scale(1);
-        opacity: 0
-      }
-    }
-
-    /* TOPBAR */
-    .topbar {
-      position: relative;
-      z-index: 50;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px 48px 12px;
-      border-bottom: 1px solid rgba(15, 23, 42, .06);
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-    }
-
-    .logo-area {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      min-width: 320px;
-    }
-
-    .logo-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 4px;
-      background: linear-gradient(135deg, #1a56db, #0891b2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .company-logo-img {
-      height: 56px;
-      max-width: 280px;
-      object-fit: contain;
-      display: none;
-    }
-
-    .logo-texts .logo-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--text);
-    }
-
-    .logo-texts .logo-sub {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .clock-area {
-      text-align: right;
-    }
-
-    .clock-time {
-      font-size: 36px;
-      font-weight: 800;
-      letter-spacing: -1px;
-      color: var(--text);
-    }
-
-    .clock-date {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-
-    .conn-status {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .conn-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ef4444;
-      transition: background .3s;
-    }
-
-    .conn-dot.live {
-      background: #10b981;
-      box-shadow: 0 0 8px #10b981;
-      animation: blink 2s infinite;
-    }
-
-    @keyframes blink {
-      50% {
-        opacity: .5
-      }
-    }
-
-    /* GLASS EFFECT FOR CONTENT OVER BACKGROUND */
-    .glass-card {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      border-radius: 4px;
-      padding: 60px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
-      width: fit-content;
-      max-width: 900px;
-      min-width: min(650px, 92vw);
-    }
-
-    /* ANA ALAN LOBI */
-.lobi-main {
-      flex: 1;
-      position: relative;
-      z-index: 20;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 0 48px;
-    }
-
-    /* HOŞ GELDİNİZ EKRANI */
-    #welcome-screen, #default-screen {
-      text-align: center;
-      animation: fadeIn .8s ease;
-    }
-    
-    #welcome-screen.with-bg, #default-screen.with-bg {
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(20px);
-      padding: 50px 100px; /* Yatayda daha geniş padding */
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.15);
-      width: fit-content;
-      max-width: 90vw;
-      min-width: min(650px, 92vw); /* Minimum genişlik sağlandı */
-      margin: auto;
-    }
-
-    .welcome-divider {
-      width: 200px; /* Ayraç biraz daha genişletildi */
-      height: 3px;
-      border-radius: 2px;
-      margin: 32px auto;
-      background: linear-gradient(90deg, #0060f0, #0b2a4e);
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(20px)
-      }
-
-      to {
-        opacity: 1;
-        transform: none
-      }
-    }
-
-    .welcome-label {
-      font-size: 18px;
-      color: var(--muted);
-      opacity: 0.7;
-      font-weight: 700;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-    }
-
-    .welcome-name {
-      font-size: clamp(48px, 8vw, 96px);
-      font-weight: 900;
-      letter-spacing: -2px;
-      color: var(--text);
-      margin-bottom: 12px;
-      line-height: 1.1;
-    }
-
-    .welcome-company {
-      font-size: clamp(18px, 3vw, 32px);
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    .welcome-host-company {
-      font-size: clamp(14px, 2vw, 20px);
-      color: var(--muted);
-      margin-top: 4px;
-    }
-
-    .welcome-purpose {
-      font-size: clamp(14px, 2vw, 20px);
-      color: var(--muted);
-    }
-
-    .welcome-host {
-      font-size: clamp(16px, 2.5vw, 24px);
-      color: var(--text);
-    }
-
-    .host-label {
-      font-size: 14px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-    }
-
-    /* DEFAULT EKRAN */
-    #default-screen {
-      text-align: center;
-      animation: fadeIn .8s ease;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transform: translateY(var(--main-shift));
-    }
-
-    .default-title {
-      font-size: clamp(36px, 6vw, 80px);
-      font-weight: 900;
-      letter-spacing: -2px;
-      line-height: 1;
-      margin-bottom: 20px;
-      color: var(--text);
-    }
-
-    .default-title span {
-      color: var(--primary);
-    }
-
-    .default-sub {
-      font-size: clamp(14px, 2vw, 22px);
-      color: var(--muted);
-      margin-bottom: 0;
-    }
-
-    /* İÇERİK EKRANI (video/görsel) */
-    #content-screen {
-      position: absolute;
-      inset: 0;
-      z-index: 5;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: #000;
-    }
-
-    #content-screen.show {
-      display: flex;
-    }
-
-    #content-screen video,
-    #content-screen img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
-
-    .content-overlay {
-      position: absolute;
-      bottom: 80px;
-      left: 0;
-      right: 0;
-      text-align: center;
-      background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
-      padding: 24px;
-    }
-
-    .content-title {
-      font-size: 24px;
-      font-weight: 700;
-      color: #fff;
-    }
-
-    /* TRANSITION */
-    .screen-transition {
-      transition: opacity .6s ease, transform .6s ease;
-    }
-
-    .screen-hide {
-      opacity: 0;
-      transform: scale(.97);
-      pointer-events: none;
-      position: absolute !important;
-    }
-
-    /* FOOTER */
-    .lobi-footer {
-      position: relative;
-      z-index: 50;
-      flex-shrink: 0;
-      height: 72px;
-      padding: 0 48px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-      color: var(--muted);
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
-    }
-
-    .lobi-ticker {
-      flex: 1;
-      overflow: hidden;
-      margin: 0 32px;
-    }
-
-    .ticker-inner {
-      display: flex;
-      gap: 64px;
-      animation: ticker 26s linear infinite;
-      white-space: nowrap;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    @keyframes ticker {
-      from {
-        transform: translateX(100vw)
-      }
-
-      to {
-        transform: translateX(-110%)
-      }
-    }
-
-    .ticker-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* FULLSCREEN BTN */
-    .fs-btn {
-      position: fixed;
-      bottom: 80px;
-      right: 24px;
-      z-index: 100;
-      width: 40px;
-      height: 40px;
-      border-radius: 4px;
-      background: rgba(0, 96, 240, .08);
-      border: 1px solid rgba(0, 96, 240, .2);
-      color: var(--primary);
-      cursor: pointer;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: .2s;
-      backdrop-filter: blur(8px);
-    }
-
-    .fs-btn:hover {
-      background: rgba(0, 96, 240, .15);
-      color: var(--primary-d);
-    }
-
-    .rotate-btn {
-      position: fixed;
-      bottom: 80px;
-      left: 24px;
-      z-index: 100;
-      width: 40px;
-      height: 40px;
-      border-radius: 4px;
-      background: rgba(11, 42, 78, .08);
-      border: 1px solid rgba(11, 42, 78, .22);
-      color: var(--primary-d);
-      cursor: pointer;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: .2s;
-      backdrop-filter: blur(8px);
-    }
-
-    .rotate-btn:hover {
-      background: rgba(11, 42, 78, .14);
-    }
-
-    body.manual-rotate #app-shell {
-      position: fixed;
-      top: 100vw;
-      left: 0;
-      width: 100vh;
-      height: 100vw;
-      transform-origin: top left;
-      transform: rotate(-90deg);
-      overflow: hidden;
-    }
-
-    body.manual-rotate .rotate-btn {
-      background: rgba(0, 96, 240, .2);
-      border-color: rgba(0, 96, 240, .35);
-      color: var(--primary);
-    }
-
-    /* ORIENTATION / RESPONSIVE */
-    @media (orientation: portrait) {
-      /*  */
-
-      .topbar {
-        padding: 12px 16px 10px;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .logo-area {
-        min-width: 0;
-        gap: 10px;
-      }
-
-      .company-logo-img {
-        height: 40px;
-        max-width: 180px;
-      }
-
-      .clock-time {
-        font-size: 22px;
-      }
-
-      .clock-date {
-        font-size: 11px;
-      }
-
-      .conn-status {
-        position: static;
-        transform: none;
-        width: 100%;
-        justify-content: center;
-        order: 3;
-      }
-
-      .main {
-        padding: 18px 14px 0;
-        justify-content: flex-start;
-      }
-
-      #welcome-screen.with-bg,
-      #default-screen.with-bg {
-        width: min(94vw, 680px);
-        min-width: 0;
-        border-radius: 4px;
-        padding: clamp(20px, 5vw, 34px) clamp(14px, 5vw, 30px);
-      }
-
-      .welcome-divider {
-        width: min(160px, 45vw);
-      }
-
-      .welcome-label {
-        letter-spacing: 2px;
-      }
-
-      .default-title {
-        font-size: clamp(30px, 12vw, 60px);
-      }
-
-      .default-sub {
-        font-size: clamp(14px, 4.8vw, 20px);
-      }
-
-      .lobi-footer {
-        height: auto;
-        min-height: 62px;
-        padding: 8px 12px;
-        gap: 8px;
-        font-size: 11px;
-      }
-
-      .lobi-ticker {
-        margin: 0 8px;
-      }
-
-      .ticker-inner {
-        gap: 30px;
-        font-size: 12px;
-        animation-duration: 22s;
-      }
-
-      .fs-btn {
-        right: 12px;
-        bottom: 72px;
-      }
-
-      .rotate-btn {
-        left: 12px;
-        bottom: 72px;
-      }
-    }
-
-    @media (orientation: landscape) and (max-height: 720px) {
-      /*  */
-
-      .topbar {
-        padding: 12px 30px 8px;
-      }
-
-      .company-logo-img {
-        height: 46px;
-      }
-
-      .clock-time {
-        font-size: 28px;
-      }
-
-      #welcome-screen.with-bg,
-      #default-screen.with-bg {
-        min-width: min(540px, 90vw);
-        padding: 34px 52px;
-        border-radius: 4px;
-      }
-
-      .lobi-footer {
-        height: 60px;
-        padding: 0 28px;
-      }
-
-      .ticker-inner {
-        font-size: 13px;
-      }
-    }
-  
+/* ═══════════════════════════════════════════════════════
+   LOBİ EKRANI — BIKMAZ GRUP
+   Referans: style.css  → --radius:4px, --radius-sm:2px
+   Font: Noto Sans (yerel sunucu, /fonts/)
+   ═══════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Tasarım Sistemi (style.css ile uyumlu) ── */
+:root {
+  /* Renkler — style.css'den birebir */
+  --lb-primary: #0060f0;
+  --lb-primary-l: #2d7cff;
+  --lb-primary-xl: #4d94ff;
+  --lb-dark: #0b2a4e;
+  --lb-dark-l: #0e3660;
+  --lb-mid: #0a3d8a;
+  --lb-white: #ffffff;
+  --lb-white-80: rgba(255, 255, 255, 0.80);
+  --lb-white-55: rgba(255, 255, 255, 0.55);
+  --lb-white-30: rgba(255, 255, 255, 0.30);
+  --lb-white-12: rgba(255, 255, 255, 0.12);
+  --lb-white-07: rgba(255, 255, 255, 0.07);
+
+  /* Border-radius — style.css ile birebir: köşeli sistem */
+  --radius: 4px;
+  --radius-sm: 2px;
+
+  /* Layout */
+  --lb-panel-w: 316px;
+  --lb-ticker-h: 48px;
+  --lb-logo-h: 68px;
+}
+
+/* ── Reset & Body ── */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: #081a38;
+  color: var(--lb-white);
+  /* Noto Sans — /fonts/noto-sans.css üzerinden */
+  font-family: 'Noto Sans', 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ═══════════════════ PARTİKÜLLER ═══════════════════ */
+.lb-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.lb-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(45, 124, 255, 0.14);
+  animation: lb-float linear infinite;
+}
+
+@keyframes lb-float {
+  0% {
+    transform: translateY(105vh) scale(0);
+    opacity: 0;
+  }
+
+  8% {
+    opacity: 1;
+  }
+
+  92% {
+    opacity: 0.25;
+  }
+
+  100% {
+    transform: translateY(-8vh) scale(1);
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════ KABUK ═══════════════════ */
+.lb-shell {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr var(--lb-panel-w);
+  height: calc(100vh - var(--lb-ticker-h));
+  background: #081a38;
+}
+
+/* ═══════════════════ SOL BÖLGE ═══════════════════ */
+.lb-left {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Logo Bandı ── */
+.lb-logo-bar {
+  flex-shrink: 0;
+  height: var(--lb-logo-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #081a38;
+  position: relative;
+  z-index: 30;
+}
+
+.lb-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Beyaz kutucuk — logo/favicon */
+.lb-logo-box {
+  width: 48px;
+  height: 48px;
+  background: #ffffff;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+}
+
+.lb-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lb-brand-texts {
+  display: flex;
+  flex-direction: column;
+}
+
+.lb-brand-name {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--lb-white);
+  line-height: 1.2;
+}
+
+.lb-brand-sub {
+  font-size: 15px;
+  color: var(--lb-white-55);
+  font-weight: 600;
+  margin-top: 3px;
+  line-height: 1.2;
+}
+
+.lb-conn-status {
+  display: flex;
+  align-items: center;
+}
+
+.lb-conn-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f59e0b;
+  transition: background 0.4s;
+}
+
+.lb-conn-dot.live {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+  animation: lb-blink 2s infinite;
+}
+
+.lb-conn-dot.dead {
+  background: #ef4444;
+}
+
+@keyframes lb-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ── Video Sarmalayıcı ── */
+.lb-video-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #010810;
+  overflow: hidden;
+}
+
+.lb-video-player {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lb-video-player video,
+.lb-video-player img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Placeholder */
+.lb-video-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--lb-white-30);
+  height: 100%;
+  width: 100%;
+  background: radial-gradient(ellipse at center, #081828 0%, #010810 100%);
+}
+
+.lb-placeholder-icon {
+  opacity: 0.25;
+}
+
+.lb-placeholder-text {
+  font-size: 15px;
+  font-weight: 500;
+  opacity: 0.4;
+  letter-spacing: 0.04em;
+}
+
+/* ── Hoşgeldiniz Bandı (video üstünde) ── */
+.lb-welcome-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 36px 32px 26px;
+  background: linear-gradient(to top,
+      rgba(3, 8, 20, 0.95) 0%,
+      rgba(3, 8, 20, 0.65) 55%,
+      transparent 100%);
+  z-index: 5;
+}
+
+.lb-welcome-bar-title {
+  font-size: clamp(26px, 3vw, 44px);
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  color: var(--lb-white);
+  line-height: 1.15;
+}
+
+.lb-welcome-bar-sub {
+  font-size: clamp(13px, 1.3vw, 18px);
+  color: var(--lb-white-80);
+  margin-top: 7px;
+  font-weight: 400;
+}
+
+/* ═══════════════════ ZİYARETÇİ OVERLAY ═══════════════════ */
+.lb-visitor-overlay {
+  position: absolute;
+  top: var(--lb-logo-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  backdrop-filter: none;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.lb-visitor-overlay.screen-hide {
+  opacity: 0;
+  transform: scale(0.98);
+  pointer-events: none;
+}
+
+.lb-visitor-card {
+  position: relative;
+  width: min(600px, 88%);
+  background: linear-gradient(145deg,
+      rgba(0, 50, 140, 0.75) 0%,
+      rgba(4, 16, 44, 0.85) 100%);
+  border: 1px solid rgba(45, 124, 255, 0.50);
+  border-radius: var(--radius);
+  padding: 44px 48px 40px;
+  text-align: center;
+  box-shadow:
+    0 0 48px rgba(0, 96, 240, 0.22),
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: lb-card-in 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+@keyframes lb-card-in {
+  from {
+    transform: translateY(24px) scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.lb-visitor-deco {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--lb-primary), var(--lb-primary-xl));
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.lb-visitor-avatar {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--lb-primary), var(--lb-primary-xl));
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 24px rgba(0, 96, 240, 0.35);
+}
+
+/* ── Sirket logosu (card üstünde) ── */
+.lb-visitor-logo-wrap {
+  display: none !important;
+}
+
+.lb-visitor-media-wrap {
+  margin: 12px auto 20px;
+  width: min(100%, 340px);
+  min-height: 110px;
+  max-height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 10px;
+}
+
+.lb-visitor-media-wrap.is-logo-plate {
+  width: min(100%, 260px);
+  min-height: 132px;
+  max-height: 132px;
+  padding: 14px 18px;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.98), rgba(244,247,255,0.94) 55%, rgba(224,232,247,0.92) 100%);
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.lb-visitor-media-wrap.is-logo-plate.is-light-logo {
+  background: radial-gradient(circle at 30% 25%, rgba(27,40,70,0.96), rgba(14,23,44,0.94) 55%, rgba(7,12,26,0.98) 100%);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.lb-visitor-card-media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.lb-visitor-host-company-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.lb-visitor-host-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 0;
+  padding: 4px;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.98), rgba(244,247,255,0.94) 55%, rgba(224,232,247,0.92) 100%);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.lb-visitor-host-logo.is-light-logo {
+  background: radial-gradient(circle at 30% 25%, rgba(27,40,70,0.96), rgba(14,23,44,0.94) 55%, rgba(7,12,26,0.98) 100%);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+
+.lb-visitor-hosgeldiniz {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--lb-primary-xl);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.lb-visitor-name {
+  font-size: clamp(32px, 4.5vw, 56px);
+  font-weight: 900;
+  color: var(--lb-white);
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+
+.lb-visitor-company {
+  font-size: clamp(16px, 1.8vw, 24px);
+  color: var(--lb-white-80);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lb-visitor-divider {
+  width: 200px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 124, 255, 0.6), transparent);
+  margin: 28px auto;
+}
+
+.lb-visitor-info-row {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.lb-visitor-info-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 140px;
+}
+
+.lb-visitor-info-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--lb-white-55);
+  text-transform: uppercase;
+}
+
+.lb-visitor-info-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--lb-white);
+}
+
+.lb-visitor-invite-badge {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lb-white-80);
+  letter-spacing: 0.08em;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+/* ═══════════════════ SAĞ PANEL ═══════════════════ */
+.lb-right-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #081a38;
+  position: relative;
+}
+
+/* Sol kenar gölgesi kaldırıldı — tek parça görünüm */
+.lb-right-panel::before {
+  display: none;
+}
+
+.lb-panel-divider {
+  height: 20px;
+  background: linear-gradient(180deg, transparent 0%, rgba(6, 20, 50, 0.4) 50%, transparent 100%);
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* ── Saat (sadece) ── */
+.lb-clock-section {
+  flex-shrink: 0;
+  padding: 22px 18px 16px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(0, 60, 160, 0.12) 0%, transparent 100%);
+}
+
+.lb-clock-time {
+  font-size: clamp(52px, 5.5vw, 72px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  color: var(--lb-white);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-clock-date {
+  font-size: 13px;
+  color: var(--lb-white-80);
+  margin-top: 7px;
+  font-weight: 500;
+}
+
+.lb-clock-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--lb-primary-xl);
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+
+/* ── Hava Durumu ── */
+.lb-weather-section {
+  flex-shrink: 0;
+  padding: 14px 16px 12px;
+}
+
+.lb-weather-city {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--lb-white-55);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.lb-weather-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.lb-weather-temp {
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: var(--lb-white);
+  line-height: 1;
+}
+
+.lb-weather-icon {
+  display: flex;
+  align-items: center;
+  color: var(--lb-white-80);
+}
+
+.lb-weather-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.lb-weather-cond {
+  font-size: 12px;
+  color: var(--lb-white-80);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.lb-weather-extra {
+  font-size: 11px;
+  color: var(--lb-white-55);
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-weather-extra span {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.15);
+  padding-bottom: 3px;
+}
+
+.lb-weather-extra b {
+  color: var(--lb-white-80);
+  font-weight: 700;
+}
+
+.lb-weather-forecast {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.lb-forecast-day {
+  flex: 1;
+  background: var(--lb-white-07);
+  border: 1px solid var(--lb-white-12);
+  border-radius: var(--radius);
+  padding: 6px 4px;
+  text-align: center;
+}
+
+.lb-forecast-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--lb-white-55);
+  margin-bottom: 2px;
+}
+
+.lb-forecast-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2px;
+  color: var(--lb-white-80);
+}
+
+.lb-forecast-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.lb-forecast-hi {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lb-white);
+}
+
+.lb-forecast-lo {
+  font-size: 10px;
+  color: var(--lb-white-55);
+}
+
+/* ── Haberler ── */
+.lb-news-section {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 50px;
+}
+
+.lb-news-heading {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--lb-primary-xl);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  opacity: 0.85;
+}
+
+.lb-news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.lb-news-item {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  background: var(--lb-white-07);
+  border: 1px solid var(--lb-white-12);
+  border-radius: var(--radius);
+  cursor: default;
+  transition: background 0.18s;
+  animation: lb-fade-slide 0.35s ease both;
+}
+
+@keyframes lb-fade-slide {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.lb-news-item:hover {
+  background: rgba(0, 96, 240, 0.12);
+  border-color: rgba(45, 124, 255, 0.25);
+}
+
+.lb-news-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lb-news-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lb-white);
+  line-height: 1.4;
+  margin-bottom: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lb-news-source {
+  font-size: 10px;
+  color: var(--lb-primary-xl);
+  font-weight: 500;
+}
+
+/* ═══════════════════ ALT KAYAN BANT ═══════════════════ */
+.lb-ticker-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--lb-ticker-h);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  /* Üst bar ve sağ panel ile aynı ton — tek parça görünüm */
+  background: #081a38;
+  overflow: hidden;
+}
+
+/* Ticker üst kenar gölgesi kaldırıldı — tek parça görünüm */
+.lb-ticker-bar::before {
+  display: none;
+}
+
+.lb-ticker-brand {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lb-white-80);
+  white-space: nowrap;
+  height: 100%;
+}
+
+.lb-ticker-track {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.lb-ticker-inner {
+  display: flex;
+  align-items: center;
+  gap: 72px;
+  white-space: nowrap;
+  animation: lb-ticker 40s linear infinite;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lb-white-80);
+}
+
+@keyframes lb-ticker {
+  from {
+    transform: translateX(100vw);
+  }
+
+  to {
+    transform: translateX(-120%);
+  }
+}
+
+.lb-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lb-ticker-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 96, 240, 0.6);
+  flex-shrink: 0;
+}
+
+.lb-ticker-date {
+  flex-shrink: 0;
+  padding: 0 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lb-white-55);
+  white-space: nowrap;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* ═══════════════════ TAM EKRAN BUTONU ═══════════════════ */
+.lb-fs-btn {
+  position: fixed;
+  bottom: calc(var(--lb-ticker-h) + 10px);
+  right: 12px;
+  z-index: 200;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  background: rgba(0, 30, 70, 0.7);
+  border: 1px solid rgba(0, 96, 240, 0.3);
+  color: var(--lb-white-55);
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s;
+  backdrop-filter: blur(8px);
+}
+
+.lb-fs-btn:hover {
+  background: rgba(0, 60, 140, 0.8);
+  border-color: rgba(0, 96, 240, 0.55);
+  color: var(--lb-white);
+}
+
+/* Tam ekran modunda küçültme ikonu göster */
+.lb-fs-btn.is-fullscreen svg {
+  display: none;
+}
+
+.lb-fs-btn.is-fullscreen::after {
+  content: "⛶";
+  font-size: 16px;
+  color: var(--lb-white-55);
+}
+
+/* ═══════════════════ HAVA DURUMU SVG İKONLARI ═══════════════════ */
+/* (JS ile inline SVG enjekte edilir, class yok) */
+
+/* ═══════════════════ ANİMASYONLAR ═══════════════════ */
+@keyframes lb-fadein {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══════════════════ RESPONSIVE ═══════════════════ */
+@media (max-width: 960px) {
+  :root {
+    --lb-panel-w: 260px;
+  }
+
+  .lb-clock-time {
+    font-size: 44px;
+  }
+
+  .lb-welcome-bar-title {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 680px) {
+  .lb-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .lb-right-panel {
+    display: none;
+  }
+}

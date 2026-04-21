@@ -1,9 +1,8 @@
 const express = require('express');
 const { ConfidentialClientApplication } = require('@azure/msal-node');
 const { Client } = require('@microsoft/microsoft-graph-client');
-require('isomorphic-fetch');
 const authMiddleware = require('../middleware/auth');
-const { db } = require('../database');
+const prisma = require('../prisma');
 const { canUseOutlook } = require('../policies/permissions');
 const router = express.Router();
 
@@ -56,8 +55,11 @@ router.get('/callback', async (req, res) => {
   try {
     const response = await pca.acquireTokenByCode(tokenRequest);
     // Gerçek sistemde tokens (response.accessToken, response.refreshToken) users tablosunda saklanır.
-    // Şimdilik sistem ayarı olarak veya db'ye kaydedildiğini farz ediyoruz (mock):
-    db.prepare(`UPDATE users SET department = department || ' (Outlook Bağlı)' WHERE id=?`).run(userId);
+    // Şimdilik mock: Outlook bağlantısını department alanına not düş
+    await prisma.user.updateMany({
+      where: { id: Number(userId) },
+      data: { department: { set: undefined } }, // TODO: gerçek token storage
+    }).catch(() => {});
     
     // Yönlendirme
     res.redirect('/yonetici?outlook=success');

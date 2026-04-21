@@ -4,12 +4,12 @@ async function loadBlacklist() {
   const tbody = document.getElementById('blacklist-tbody');
   tbody.innerHTML = list.length ? list.map(b => `
     <tr>
-      <td><strong>${b.full_name}</strong></td>
-      <td>${b.tc_no||'—'}</td>
-      <td>${b.company||'—'}</td>
-      <td><span style="color:#ef4444">${b.reason||'—'}</span></td>
+      <td><strong>${esc(b.full_name)}</strong></td>
+      <td>${esc(b.tc_no)||'—'}</td>
+      <td>${esc(b.company)||'—'}</td>
+      <td><span style="color:#ef4444">${esc(b.reason)||'—'}</span></td>
       <td>${formatDate(b.created_at)}</td>
-      <td><button class="btn-secondary" style="color:#ef4444;font-size:12px;padding:5px 10px" onclick="removeFromBlacklist(${b.id})">Kaldır</button></td>
+      <td><button class="btn-secondary" style="color:#ef4444;font-size:12px;padding:5px 10px" onclick="withButtonLock(this, function(){ return removeFromBlacklist(${b.id}) })">Kaldır</button></td>
     </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Kara liste boş</td></tr>';
 }
 
@@ -30,7 +30,7 @@ function showBlacklistModal() {
       <div class="form-group"><label>Sebep *</label><textarea id="bl-reason" class="form-input" rows="2"></textarea></div>
       <div class="form-actions">
         <button class="btn-secondary" onclick="closeModal()">İptal</button>
-        <button class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626)" onclick="addToBlacklist()">Kara Listeye Ekle</button>
+        <button class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626)" onclick="withButtonLock(this, addToBlacklist)">Kara Listeye Ekle</button>
       </div>
     </div>`);
 }
@@ -43,6 +43,7 @@ async function addToBlacklist() {
     reason: document.getElementById('bl-reason').value
   };
   if (!body.full_name) { showToast('Ad soyad zorunlu!', 'error'); return; }
+  if (body.tc_no && !isValidTC(body.tc_no)) { showToast('TC kimlik numarası 11 haneli rakamlardan oluşmalıdır.', 'error'); return; }
   await api.addBlacklist(body);
   closeModal(); showToast('⛔ Kara listeye eklendi'); loadBlacklist();
 }

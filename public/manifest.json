@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "Dijital Ziyaretci Karsilama Sistemi",
+  "short_name": "Ziyaretci",
+  "description": "Kurumsal dijital ziyaretci karsilama ve ekran yonetim sistemi",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f9fc",
+  "theme_color": "#0060f0",
+  "orientation": "any",
+  "lang": "tr",
+  "dir": "ltr",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/Assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

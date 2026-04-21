@@ -9,8 +9,32 @@
     'visitor:rejected',
     'visitor:checkout',
     'visitor:cancelled',
+    'visitor:deleted',
+    'appointment:created',
+    'appointment:updated',
+    'appointment:approved',
+    'appointment:cancelled',
+    'appointment:deleted',
+    'personnel:created',
+    'personnel:updated',
+    'personnel:deleted',
+    'blacklist:created',
+    'blacklist:deleted',
+    'room:created',
+    'room:updated',
+    'room:deleted',
+    'room:reserved',
+    'room:reservation_cancelled',
+    'user:created',
+    'user:updated',
+    'user:deleted',
+    'company:created',
+    'company:updated',
+    'company:deleted',
     'screen:update',
     'system:reload',
+    'content:updated',
+    'settings:updated',
   ];
 
   function vdCreateSocket(options) {
@@ -23,11 +47,21 @@
     const socket = io(opts.url, opts.ioOptions || {});
     const handlers = opts.handlers || {};
 
+    function runHandler(label, fn, args) {
+      if (typeof fn !== 'function') return undefined;
+      try {
+        return fn.apply(null, args);
+      } catch (err) {
+        console.error(`[Socket] Handler failed for ${label}:`, err);
+        return undefined;
+      }
+    }
+
     SOCKET_EVENTS.forEach(function(eventName) {
       socket.on(eventName, function(payload) {
         if (eventName === 'system:reload') {
           if (typeof opts.onSystemReload === 'function') {
-            const shouldContinue = opts.onSystemReload(payload, socket);
+            const shouldContinue = runHandler('system:reload:onSystemReload', opts.onSystemReload, [payload, socket]);
             if (shouldContinue === false) return;
           }
           if (opts.autoReloadOnSystem !== false) {
@@ -36,20 +70,16 @@
           }
         }
 
-        if (typeof handlers[eventName] === 'function') {
-          handlers[eventName](payload, socket);
-        }
-        if (typeof handlers['*'] === 'function') {
-          handlers['*'](eventName, payload, socket);
-        }
+        runHandler(eventName, handlers[eventName], [payload, socket]);
+        runHandler('*', handlers['*'], [eventName, payload, socket]);
       });
     });
 
     if (typeof opts.onConnect === 'function') {
-      socket.on('connect', function() { opts.onConnect(socket); });
+      socket.on('connect', function() { runHandler('connect', opts.onConnect, [socket]); });
     }
     if (typeof opts.onDisconnect === 'function') {
-      socket.on('disconnect', function(reason) { opts.onDisconnect(reason, socket); });
+      socket.on('disconnect', function(reason) { runHandler('disconnect', opts.onDisconnect, [reason, socket]); });
     }
 
     return socket;

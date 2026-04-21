@@ -15,13 +15,23 @@
     try {
       if (!window.api || typeof window.api.getScreenState !== 'function') return;
       const state = await window.api.getScreenState();
-      const logoPath = (state && state.settings && (state.settings.lobby_logo_path || state.settings.company_logo_path)) || '/Assets/sitelogo.png';
+      const rawLogoPath = (state && state.settings && (state.settings.lobby_logo_path || state.settings.company_logo_path)) || '/Assets/sitelogo.png';
+      const logoPath = normalizeBrandLogoPath(rawLogoPath);
       const logoId = opts.logoElementId || detectLogoId();
       const logoImg = logoId ? document.getElementById(logoId) : null;
       if (logoImg && logoPath) logoImg.src = logoPath;
     } catch (e) {
       console.warn('Branding load failed', e.message);
     }
+  }
+
+  function normalizeBrandLogoPath(logoPath) {
+    if (!logoPath) return '/Assets/sitelogo.png';
+    const value = String(logoPath);
+    if (/B%C4%B1kmazGrup\.jpg|BıkmazGrup\.jpg|BikmazGrup\.jpg/i.test(value)) {
+      return '/Assets/sitelogo.png';
+    }
+    return value;
   }
 
   function vdApplyUserChip(user, options) {
@@ -42,6 +52,7 @@
 
   window.vdApplyPanelBranding = vdApplyPanelBranding;
   window.vdApplyUserChip = vdApplyUserChip;
+  window.vdNormalizeBrandLogoPath = normalizeBrandLogoPath;
 
   if (typeof window.applyPanelBranding !== 'function') window.applyPanelBranding = vdApplyPanelBranding;
 })();

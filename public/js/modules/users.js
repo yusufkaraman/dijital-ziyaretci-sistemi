@@ -63,8 +63,8 @@ async function showUserModal(id = null) {
         </div>
         <div class="form-group">
           <label>Şifre ${id?'(Değiştirmek istiyorsanız yazın)':''}</label>
-          <input type="password" id="usr-pass" class="form-input" placeholder="••••••••" />
-          <div style="font-size:11px;color:var(--text-3);margin-top:4px">Şifre en az 8 karakter olmalıdır.</div>
+          <input type="text" id="usr-pass" class="form-input" autocomplete="new-password" placeholder="${id ? 'Yeni şifre girerseniz aynen görünür ve güncellenir' : 'En az 8 karakter'}" />
+          <div style="font-size:11px;color:var(--text-3);margin-top:4px">${id ? 'Güvenlik nedeniyle mevcut şifre okunamaz; buraya yeni şifre yazarsanız tam metin olarak görünür.' : 'Şifre en az 8 karakter olmalıdır.'}</div>
         </div>
         <div class="form-group">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">

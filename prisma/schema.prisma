@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated-client"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         String
+  department   String?
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  personnel        Personnel[]
+  visitors         Visitor[]         @relation("HostUser")
+  appointments     Appointment[]     @relation("HostUserAppt")
+  roomReservations RoomReservation[]
+  blacklistedBy    Blacklist[]       @relation("AddedByUser")
+  activityLogs     ActivityLog[]
+
+  @@map("users")
+  @@index([role, isActive])
+}
+
+model Company {
+  id         Int       @id @default(autoincrement())
+  name       String
+  logoPath   String?   @map("logo_path")
+  themeColor String?   @default("#1a56db") @map("theme_color")
+  isDefault  Boolean   @default(false) @map("is_default")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  personnel  Personnel[]
+  contents   Content[]
+  visitedVisitors     Visitor[]     @relation("VisitedCompanyVisitor")
+  visitedAppointments Appointment[] @relation("VisitedCompanyAppointment")
+
+  @@map("companies")
+  @@index([isDefault, isActive])
+}
+
+model Personnel {
+  id         Int       @id @default(autoincrement())
+  companyId  Int?      @map("company_id")
+  fullName   String    @map("full_name")
+  title      String?
+  department String?
+  phone      String?
+  email      String?
+  userId     Int?      @map("user_id")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  company    Company?  @relation(fields: [companyId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
+  
+  visitorsAsHost      Visitor[]     @relation("HostPersonnel")
+  appointmentsAsHost  Appointment[] @relation("HostPersonnelAppt")
+
+  @@map("personnel")
+  @@index([companyId, isActive])
+  @@index([userId])
+}
+
+model Visitor {
+  id               Int       @id @default(autoincrement())
+  fullName         String    @map("full_name")
+  tcNo             String?   @map("tc_no")
+  phone            String?
+  email            String?
+  companyName      String?   @map("company_name")
+  vehiclePlate     String?   @map("vehicle_plate")
+  visitorCount     Int       @default(1) @map("visitor_count")
+  visitedCompanyId Int?      @map("visited_company_id")
+  hostPersonnelId  Int?      @map("host_personnel_id")
+  hostUserId       Int?      @map("host_user_id")
+  reason           String?
+  notes            String?
+  status           String    @default("waiting")
+  isApproved       Boolean   @default(false) @map("is_approved")
+  isScreenActive   Boolean   @default(false) @map("is_screen_active")
+  plannedTime      DateTime? @map("planned_time") @db.Timestamptz
+  arrivalTime      DateTime? @map("arrival_time") @db.Timestamptz
+  checkoutTime     DateTime? @map("checkout_time") @db.Timestamptz
+  createdBy        Int?      @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  hostPersonnel    Personnel?   @relation("HostPersonnel", fields: [hostPersonnelId], references: [id])
+  hostUser         User?        @relation("HostUser", fields: [hostUserId], references: [id])
+  visitedCompany   Company?     @relation("VisitedCompanyVisitor", fields: [visitedCompanyId], references: [id])
+  appointments     Appointment[]
+
+  @@map("visitors")
+  @@index([status, createdAt(sort: Desc)])
+  @@index([hostUserId, createdAt(sort: Desc)])
+  @@index([hostPersonnelId, createdAt(sort: Desc)])
+  @@index([visitedCompanyId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([tcNo])
+}
+
+model Appointment {
+  id               Int       @id @default(autoincrement())
+  visitorName      String    @map("visitor_name")
+  visitorTc        String?   @map("visitor_tc")
+  visitorPhone     String?   @map("visitor_phone")
+  visitorEmail     String?   @map("visitor_email")
+  visitorCompany   String?   @map("visitor_company")
+  vehiclePlate     String?   @map("vehicle_plate")
+  visitorCount     Int       @default(1) @map("visitor_count")
+  visitedCompanyId Int?      @map("visited_company_id")
+  hostPersonnelId  Int?      @map("host_personnel_id")
+  hostUserId       Int?      @map("host_user_id")
+  reason           String?
+  notes            String?
+  plannedTime      DateTime  @map("planned_time") @db.Timestamptz
+  status           String    @default("planned")
+  visitorId        Int?      @map("visitor_id")
+  createdBy        Int?      @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  visitor          Visitor?   @relation(fields: [visitorId], references: [id])
+  hostPersonnel    Personnel? @relation("HostPersonnelAppt", fields: [hostPersonnelId], references: [id])
+  hostUser         User?      @relation("HostUserAppt", fields: [hostUserId], references: [id])
+  visitedCompany   Company?   @relation("VisitedCompanyAppointment", fields: [visitedCompanyId], references: [id])
+
+  @@map("appointments")
+  @@index([plannedTime(sort: Asc), status])
+  @@index([hostUserId, plannedTime(sort: Asc)])
+  @@index([hostPersonnelId, plannedTime(sort: Asc)])
+  @@index([visitedCompanyId, plannedTime(sort: Asc)])
+}
+
+model Room {
+  id               Int       @id @default(autoincrement())
+  name             String
+  capacity         Int       @default(10)
+  floor            String?
+  equipment        String?
+  status           String    @default("available")
+  currentVisitorId Int?      @map("current_visitor_id")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  reservations     RoomReservation[]
+
+  @@map("rooms")
+}
+
+model RoomReservation {
+  id         Int       @id @default(autoincrement())
+  roomId     Int       @map("room_id")
+  userId     Int?      @map("user_id")
+  title      String
+  startTime  DateTime  @map("start_time") @db.Timestamptz
+  endTime    DateTime  @map("end_time") @db.Timestamptz
+  status     String    @default("active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  room       Room      @relation(fields: [roomId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@map("room_reservations")
+}
+
+model Blacklist {
+  id         Int       @id @default(autoincrement())
+  fullName   String    @map("full_name")
+  tcNo       String?   @map("tc_no")
+  company    String?
+  reason     String?
+  addedBy    Int?      @map("added_by")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  addedByUser User?    @relation("AddedByUser", fields: [addedBy], references: [id])
+
+  @@map("blacklist")
+}
+
+model Content {
+  id           Int       @id @default(autoincrement())
+  companyId    Int?      @map("company_id")
+  type         String
+  filePath     String?   @map("file_path")
+  title        String?
+  contentText  String?   @map("content_text")
+  displayOrder Int       @default(0) @map("display_order")
+  isDefault    Boolean   @default(false) @map("is_default")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  company      Company?  @relation(fields: [companyId], references: [id])
+
+  @@map("contents")
+}
+
+model ActivityLog {
+  id         Int       @id @default(autoincrement())
+  userId     Int?      @map("user_id")
+  action     String
+  entityType String?   @map("entity_type")
+  entityId   Int?      @map("entity_id")
+  details    String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+}
+
+model ScreenLog {
+  id              Int       @id @default(autoincrement())
+  visitorId       Int?      @map("visitor_id")
+  contentId       Int?      @map("content_id")
+  action          String?
+  startTime       DateTime? @map("start_time") @db.Timestamptz
+  endTime         DateTime? @map("end_time") @db.Timestamptz
+  durationSeconds Int?      @map("duration_seconds")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("screen_logs")
+  @@index([visitorId, createdAt(sort: Desc)])
+  @@index([startTime(sort: Desc)])
+}
+
+model SystemSetting {
+  id        Int       @id @default(autoincrement())
+  key       String    @unique
+  value     String?
+  label     String?
+  updatedAt DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("system_settings")
+}
+
+model SystemLog {
+  id        Int       @id @default(autoincrement())
+  level     String    @default("info")
+  module    String?
+  message   String
+  details   String?
+  userId    Int?      @map("user_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("system_logs")
+}
+
+model PushSubscription {
+  id             Int       @id @default(autoincrement())
+  userId         Int?      @map("user_id")
+  subscription   String
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("push_subscriptions")
+  @@unique([userId, subscription])
+}

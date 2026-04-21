@@ -15,6 +15,7 @@
 
   const ASSIGNABLE_ROLES_BY_ACTOR = {
     admin: ['admin', 'manager', 'secretary', 'personnel'],
+    manager: ['manager', 'secretary', 'personnel'],
     secretary: ['secretary', 'personnel'],
   };
 

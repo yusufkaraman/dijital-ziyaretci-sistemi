@@ -2,6 +2,16 @@
 
     
     /*  */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      height: auto;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+    }
     body::before { display:none; }
     .particles { display:none; }
 
@@ -9,30 +19,34 @@
       background: #ffffff;
       border: 1px solid #dbe3ef;
       border-radius: 4px;
-      padding: 48px 40px;
+      padding: 28px 32px;
       width: 420px;
       max-width: 95vw;
       position: relative;
       z-index: 10;
       box-shadow: 0 16px 48px rgba(10,28,51,0.08);
       animation: slideUp 0.5s ease;
+      margin: auto 0;
     }
     @keyframes slideUp {
       from { opacity:0; transform:translateY(30px); }
       to   { opacity:1; transform:translateY(0); }
     }
-    .logo-wrap { text-align:center; margin-bottom:32px; }
+    .logo-wrap { text-align:center; margin-bottom:16px; }
     .logo-icon {
-      width:64px; height:64px;
-      margin: 0 auto 16px auto;
+      width: 180px; height: 64px;
+      max-width: 100%;
+      margin: 0 auto 8px auto;
       display: flex; align-items:center; justify-content:center;
+      background: transparent !important;
+      box-shadow: none !important;
     }
-    .logo-title { display:block; font-size:26px; font-weight:800; color:#101218; letter-spacing:-0.5px; }
+    .logo-title { display:block; font-size:20px; font-weight:800; color:#101218; letter-spacing:-0.5px; }
     .logo-sub { display:block; font-size:13px; color:#6c7380; margin-top:4px; }
-    .form-group { margin-bottom:20px; }
-    label { display:block; font-size:12px; font-weight:700; color:#404550; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; }
+    .form-group { margin-bottom:14px; }
+    label { display:block; font-size:11px; font-weight:700; color:#404550; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
     input {
-      width:100%; padding:14px 16px;
+      width:100%; padding:10px 14px;
       background:#ffffff;
       border:1.5px solid #dbe3ef;
       border-radius: 4px; color:#101218; font-size:15px;
@@ -42,7 +56,7 @@
     input:focus { border-color:#2d7cff; box-shadow:0 0 0 3px rgba(45,124,255,0.15); }
     input::placeholder { color:#a0abc0; }
     .btn-login {
-      width:100%; padding:15px;
+      width:100%; padding:12px;
       background:linear-gradient(135deg,#0060f0,#0047b3);
       border:none; border-radius: 4px; color:#fff;
       font-size:15px; font-weight:700; cursor:pointer;
@@ -58,17 +72,9 @@
       color:#dc2626; border-radius: 4px; padding:12px 16px;
       font-size:13px; margin-bottom:16px; display:none;
     }
-    .hint-box {
-      margin-top:24px; padding:16px;
-      background:#f8fafc;
-      border:1px solid #dbe3ef;
-      border-radius: 4px;
-    }
-    .hint-box p { font-size:11px; color:#6c7380; margin-bottom:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
-    .hint-box code { display:block; font-size:12px; color:#404550; padding:2px 0;  }
-    .quick-links { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:20px; }
+    .quick-links { display:flex; justify-content:center; margin-top:12px; }
     .quick-link {
-      padding:10px; border-radius: 4px; text-align:center;
+      padding:8px; border-radius: 4px; text-align:center;
       background:#ffffff; border:1px solid #c6d3e4;
       color:#404550; font-size:12px; font-weight:600; text-decoration:none;
       transition:all 0.2s; cursor:pointer;

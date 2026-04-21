@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
-const { db } = require('../database');
+const prisma = require('../prisma');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   const auth = req.headers['authorization'];
   if (!auth || !auth.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token gerekli' });
@@ -11,20 +11,22 @@ module.exports = (req, res, next) => {
   // 1️⃣ JWT doğrulama — sadece JWT hatası 401 döndürür
   let payload;
   try {
-    payload = jwt.verify(token, process.env.JWT_SECRET);
+    payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch (e) {
     return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token' });
   }
 
   // 2️⃣ DB sorgusu — DB hatası 500 döndürür (401 değil)
   try {
-    const user = db.prepare(
-      'SELECT id, username, full_name, role, department FROM users WHERE id=? AND is_active=1'
-    ).get(payload.id);
+    const user = await prisma.user.findFirst({
+      where: { id: payload.id, isActive: true },
+      select: { id: true, username: true, fullName: true, role: true, department: true },
+    });
 
     if (!user) return res.status(401).json({ error: 'Kullanıcı bulunamadı veya devre dışı' });
 
-    req.user = user;
+    // API contract: frontend full_name anahtarını bekliyor
+    req.user = { ...user, full_name: user.fullName };
     next();
   } catch (e) {
     console.error('Auth DB hatası:', e.message);

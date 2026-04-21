@@ -121,6 +121,7 @@ const api = {
   createUser: function(data) { return apiJson('/users', 'POST', data); },
   updateUser: function(id, data) { return apiJson('/users/' + id, 'PUT', data); },
   deleteUser: function(id) { return apiFetch('/users/' + id, { method: 'DELETE' }); },
+  purgeUser: function(id) { return apiFetch('/users/' + id + '/purge', { method: 'DELETE' }); },
 
   // Visitors
   getVisitors: function(params) { return apiFetch('/visitors' + buildQuery(params)); },
@@ -153,6 +154,7 @@ const api = {
   createAppointment: function(data) { return apiJson('/appointments', 'POST', data); },
   updateAppointment: function(id, data) { return apiJson('/appointments/' + id, 'PUT', data); },
   cancelAppointment: function(id) { return apiFetch('/appointments/' + id + '/cancel', { method: 'PUT' }); },
+  approveAppointment: function(id) { return apiFetch('/appointments/' + id + '/approve', { method: 'PUT' }); },
   deleteAppointment: function(id) { return apiFetch('/appointments/' + id, { method: 'DELETE' }); },
 
   // Rooms
@@ -178,6 +180,7 @@ const api = {
   updateSettings: function(data) { return apiJson('/settings', 'PUT', data); },
   getContents: function() { return apiFetch('/contents'); },
   uploadContent: function(formData) { return apiMultipart('/contents/upload', formData, 'POST'); },
+  updateContent: function(id, data) { return apiJson('/contents/' + id, 'PUT', data); },
   deleteContent: function(id) { return apiFetch('/contents/' + id, { method: 'DELETE' }); },
 
   // Push + logs
@@ -188,3 +191,9 @@ const api = {
   startOutlookLogin: function() { return apiFetch('/outlook/login'); },
   syncOutlook: function() { return apiFetch('/outlook/sync', { method: 'POST' }); },
 };
+
+if (typeof window !== 'undefined') {
+  window.api = api;
+  window.apiPublicFetch = apiPublicFetch;
+  window.apiFetch = apiFetch;
+}

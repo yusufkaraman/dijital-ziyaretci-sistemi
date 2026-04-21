@@ -1,45 +1,73 @@
-function buildHostUserFilterSql(recordAlias, personnelAlias) {
-  return `(
-    ${recordAlias}.host_user_id=?
-    OR ${personnelAlias}.user_id=?
-    OR lower(trim(coalesce(${personnelAlias}.full_name,''))) = lower(trim(coalesce((SELECT full_name FROM users WHERE id=?), '')))
-  )`;
-}
+const prisma = require('../prisma');
 
-function resolveHostUserIdFromPersonnel(db, hostPersonnelId, options) {
+/**
+ * host_personnel_id'den host_user_id'yi çözer.
+ * Prisma versiyonu: db parametresi kaldırıldı.
+ * Plan §4.8: legacy name-based fallback korunuyor.
+ */
+async function resolveHostUserIdFromPersonnel(hostPersonnelId, options) {
   const opts = options || {};
   if (!hostPersonnelId) {
     return { found: false, hostUserId: null, personnel: null };
   }
 
-  const whereActive = opts.requireActive ? ' AND is_active=1' : '';
-  const personnel = db.prepare(`
-    SELECT id, full_name, NULLIF(user_id,0) as user_id
-    FROM personnel
-    WHERE id=?${whereActive}
-  `).get(hostPersonnelId);
+  const where = { id: Number(hostPersonnelId) };
+  if (opts.requireActive) where.isActive = true;
+
+  const personnel = await prisma.personnel.findFirst({
+    where,
+    select: { id: true, fullName: true, userId: true },
+  });
 
   if (!personnel) {
     return { found: false, hostUserId: null, personnel: null };
   }
 
-  let hostUserId = personnel.user_id || null;
+  let hostUserId = personnel.userId || null;
+
+  // İsim bazlı fallback: personelin user_id'si yoksa full_name eşleşmesiyle bul
   if (!hostUserId) {
-    const linkedUser = db.prepare('SELECT id FROM users WHERE lower(trim(full_name))=lower(trim(?)) LIMIT 1').get(personnel.full_name);
-    if (linkedUser && linkedUser.id) {
+    const linkedUser = await prisma.user.findFirst({
+      where: { fullName: { equals: personnel.fullName, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (linkedUser) {
       hostUserId = linkedUser.id;
-      db.prepare('UPDATE personnel SET user_id=? WHERE id=?').run(linkedUser.id, personnel.id);
+      // Kalıcı olarak güncelle
+      await prisma.personnel.update({
+        where: { id: personnel.id },
+        data: { userId: linkedUser.id },
+      });
     }
   }
 
+  return { found: true, hostUserId, personnel };
+}
+
+/**
+ * Prisma where clause'u olarak host_user_id filtresi üretir.
+ * buildHostUserFilterSql'in Prisma ORM karşılığı.
+ * @param {number} hostUserId
+ * @returns {object} Prisma where condition
+ */
+function buildHostUserFilter(hostUserId) {
+  const id = Number(hostUserId);
   return {
-    found: true,
-    hostUserId,
-    personnel,
+    OR: [
+      { hostUserId: id },
+      { hostPersonnel: { userId: id } },
+      {
+        hostPersonnel: {
+          fullName: {
+            equals: { equals: id },
+          },
+        },
+      },
+    ],
   };
 }
 
 module.exports = {
-  buildHostUserFilterSql,
   resolveHostUserIdFromPersonnel,
+  buildHostUserFilter,
 };

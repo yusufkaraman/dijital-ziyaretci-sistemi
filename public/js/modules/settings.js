@@ -47,7 +47,10 @@ async function loadCompaniesList() {
   const tbody = document.getElementById('companies-tbody');
   tbody.innerHTML = companies.map(c => `
     <tr>
-      <td><strong>${c.name}</strong> ${c.is_default ? '⭐' : ''}</td>
+      <td style="display:flex;align-items:center;gap:10px">
+        ${c.logo_path ? `<img src="${esc(c.logo_path)}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#fff;padding:2px" />` : `<div style="width:28px;height:28px;border-radius:4px;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">—</div>`}
+        <strong>${esc(c.name)}</strong> ${c.is_default ? '⭐' : ''}
+      </td>
       <td><div style="width:20px;height:20px;border-radius:4px;background:${c.theme_color}"></div></td>
       <td><span class="status-badge ${c.is_active ? 'status-inside' : 'status-left'}">${c.is_active ? 'Aktif' : 'Pasif'}</span></td>
       <td>
@@ -66,10 +69,10 @@ async function loadUsers() {
     : { admin:'Admin', manager:'Yönetici', secretary:'Sekreter', personnel:'Personel' };
   tbody.innerHTML = users.map(u => `
     <tr>
-      <td><code>${u.username}</code></td>
-      <td><strong>${u.full_name}</strong></td>
-      <td>${roleMap[u.role] || u.role}</td>
-      <td>${u.role === 'personnel' ? `<span class="status-badge status-inside">${u.company_name || 'Şirket yok'}</span>` : '—'}</td>
+      <td><code>${esc(u.username)}</code></td>
+      <td><strong>${esc(u.full_name)}</strong></td>
+      <td>${esc(roleMap[u.role] || u.role)}</td>
+      <td>${u.role === 'personnel' ? `<span class="status-badge status-inside">${esc(u.company_name) || 'Şirket yok'}</span>` : '—'}</td>
       <td><span class="status-badge ${u.is_active ? 'status-inside' : 'status-left'}">${u.is_active ? 'Aktif' : 'Pasif'}</span></td>
       <td><button class="btn-text" onclick="showUserModal(${u.id})">Düzenle</button></td>
     </tr>`).join('');
@@ -123,8 +126,8 @@ async function showUserModal(id = null) {
         </div>
         <div class="form-group">
           <label>Şifre ${id?'(Değiştirmek istiyorsanız yazın)':''}</label>
-          <input type="password" id="usr-pass" class="form-input" placeholder="••••••••" />
-          <div style="font-size:11px;color:var(--text-3);margin-top:4px">Şifre en az 8 karakter olmalıdır.</div>
+          <input type="text" id="usr-pass" class="form-input" autocomplete="new-password" placeholder="${id ? 'Yeni şifre girerseniz aynen görünür ve güncellenir' : 'En az 8 karakter'}" />
+          <div style="font-size:11px;color:var(--text-3);margin-top:4px">${id ? 'Güvenlik nedeniyle mevcut şifre okunamaz; buraya yeni şifre yazarsanız tam metin olarak görünür.' : 'Şifre en az 8 karakter olmalıdır.'}</div>
         </div>
         <div class="form-group">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -142,7 +145,14 @@ async function showUserModal(id = null) {
   }
 }
 
+let _saveUserBusy = false;
 async function saveUser(id) {
+  if (_saveUserBusy) return;
+  _saveUserBusy = true;
+  try { await _doSaveUser(id); } finally { _saveUserBusy = false; }
+}
+
+async function _doSaveUser(id) {
   const actor = getUser();
   const isSecretary = window.vdPermissions
     ? window.vdPermissions.isSecretary(actor)
@@ -248,7 +258,7 @@ async function showRoomModal(id = null) {
 async function saveRoom(id) {
   const body = {
     name: document.getElementById('rm-name').value,
-    capacity: document.getElementById('rm-cap').value,
+    capacity: Number(document.getElementById('rm-cap').value) || 10,
     floor: document.getElementById('rm-floor').value,
     equipment: document.getElementById('rm-eq').value
   };
@@ -264,9 +274,9 @@ async function loadBlacklistSettings() {
   const tbody = document.getElementById('blacklist-settings-tbody');
   tbody.innerHTML = list.map(b => `
     <tr>
-      <td><strong>${b.full_name}</strong></td>
-      <td>${b.tc_no || b.company || '—'}</td>
-      <td><span style="color:var(--red);font-size:12px">${b.reason}</span></td>
+      <td><strong>${esc(b.full_name)}</strong></td>
+      <td>${esc(b.tc_no || b.company) || '—'}</td>
+      <td><span style="color:var(--red);font-size:12px">${esc(b.reason)}</span></td>
       <td><button class="btn-text" onclick="deleteBlacklist(${b.id})">Kaldır</button></td>
     </tr>`).join('');
 }
@@ -279,7 +289,7 @@ async function showBlacklistModal() {
       <div class="form-group"><label>Engelleme Nedeni</label><textarea id="bl-reason" class="form-input"></textarea></div>
       <div class="form-actions">
         <button class="btn-secondary" onclick="closeModal()">İptal</button>
-        <button class="btn-primary" onclick="saveBlacklist()">Kaydet</button>
+        <button class="btn-primary" onclick="withButtonLock(this, saveBlacklist)">Kaydet</button>
       </div>
     </div>`);
 }
@@ -302,44 +312,212 @@ async function deleteBlacklist(id) {
   showToast('Kişi kara listeden çıkarıldı'); loadBlacklistSettings();
 }
 
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+}
+
+// ── İçerik cache (edit modal için) ──
+let _contentsCache = [];
+let _companiesCache = [];
+
 async function loadScreensContent() {
-  const contents = await api.getContents();
+  const [contents, companies] = await Promise.all([api.getContents(), api.getCompanies()]);
+  _contentsCache = contents;
+  _companiesCache = companies;
+
+  // Sirket dropdown'unu doldur (upload icin)
+  const uploadSelect = document.getElementById('media-upload-company');
+  if (uploadSelect) {
+    uploadSelect.innerHTML = '<option value="">Genel (Tum Sirketler)</option>' +
+      companies.map(co => `<option value="${co.id}">${esc(co.name)}</option>`).join('');
+  }
+
   const grid = document.getElementById('screens-content-grid');
-  grid.innerHTML = contents.map(c => `
-    <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative">
-      ${c.type === 'image' ? `<img src="${c.file_path}" style="width:100%;height:100px;object-fit:cover"/>` : 
-        `<div style="height:100px;background:#000;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px">▶️</div>`}
+  grid.innerHTML = contents.map(c => {
+    const companyBadge = c.company_name
+      ? `<div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+           ${c.company_logo ? `<img src="${esc(c.company_logo)}" style="width:16px;height:16px;object-fit:contain;border-radius:2px"/>` : ''}
+           <span style="font-size:10px;color:var(--primary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.company_name)}</span>
+         </div>`
+      : `<div style="font-size:10px;color:var(--text-3);margin-top:4px">Genel</div>`;
+    const activeStyle = c.is_active ? '' : 'opacity:0.5;';
+    return `
+    <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;${activeStyle}">
+      ${c.type === 'image' ? `<img src="${esc(c.file_path)}" style="width:100%;height:100px;object-fit:cover"/>` :
+        `<div style="height:100px;background:#000;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px">▶</div>`}
+      ${!c.is_active ? '<div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px">PASIF</div>' : ''}
       <div style="padding:10px">
-        <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c.title}">${c.title}</div>
-        <div style="display:flex;justify-content:space-between;margin-top:5px">
-          <button class="btn-text" style="color:var(--red)" onclick="deleteContent(${c.id})">Sil</button>
-          <span style="font-size:10px;color:var(--text-3)">${c.type.toUpperCase()}</span>
+        <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(c.title || 'Isimsiz')}">${esc(c.title || 'Isimsiz')}</div>
+        ${companyBadge}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <div style="display:flex;gap:6px">
+            <button class="btn-text" style="color:var(--primary);font-size:11px" onclick="showEditContentModal(${c.id})">Duzenle</button>
+            <button class="btn-text" style="color:var(--red);font-size:11px" onclick="deleteContent(${c.id})">Sil</button>
+          </div>
+          <span style="font-size:10px;color:var(--text-3)">${c.type.toUpperCase()} ${c.file_size ? formatFileSize(c.file_size) : ''}</span>
         </div>
       </div>
-    </div>`).join('');
-  if (contents.length === 0) grid.innerHTML = '<div class="empty-state">Henüz içerik yüklenmemiş.</div>';
+    </div>`;
+  }).join('');
+  if (contents.length === 0) grid.innerHTML = '<div class="empty-state">Henuz icerik yuklenmemis.</div>';
+
+  // Ticker mesajlarini yukle
+  loadTickerMessages();
 }
+
+function showEditContentModal(contentId) {
+  const c = _contentsCache.find(x => x.id === contentId);
+  if (!c) return;
+  const companyOptions = '<option value="">Genel (Tum Sirketler)</option>' +
+    _companiesCache.map(co => `<option value="${co.id}" ${co.id === c.company_id ? 'selected' : ''}>${esc(co.name)}</option>`).join('');
+
+  showModal('Icerik Duzenle', `
+    <input type="hidden" id="edit-content-id" value="${c.id}" />
+    <div class="form-group"><label>Baslik</label><input type="text" id="edit-content-title" class="form-input" value="${(c.title || '').replace(/"/g, '&quot;')}" /></div>
+    <div class="form-group"><label>Sirket Etiketi</label><select id="edit-content-company" class="form-input">${companyOptions}</select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Gosterim Sirasi</label><input type="number" id="edit-content-order" class="form-input" value="${c.display_order || 0}" min="0" /></div>
+      <div class="form-group" style="display:flex;flex-direction:column;gap:8px;padding-top:22px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="edit-content-active" ${c.is_active ? 'checked' : ''} /> Aktif</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="edit-content-default" ${c.is_default ? 'checked' : ''} /> Varsayilan</label>
+      </div>
+    </div>
+    ${c.type === 'image' ? `<div style="margin-top:8px"><img src="${esc(c.file_path)}" style="width:100%;max-height:150px;object-fit:contain;border-radius:6px;border:1px solid var(--border)" /></div>` : ''}
+    <div class="form-actions" style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn-primary" onclick="withButtonLock(this, saveContentEdit)">Kaydet</button>
+      <button class="btn-secondary" onclick="closeModal()">Iptal</button>
+    </div>
+  `);
+}
+
+async function saveContentEdit() {
+  const id = Number(document.getElementById('edit-content-id').value);
+  const data = {
+    title: document.getElementById('edit-content-title').value,
+    company_id: document.getElementById('edit-content-company').value || null,
+    display_order: Number(document.getElementById('edit-content-order').value) || 0,
+    is_active: document.getElementById('edit-content-active').checked ? 1 : 0,
+    is_default: document.getElementById('edit-content-default').checked ? 1 : 0,
+  };
+  try {
+    await api.updateContent(id, data);
+    closeModal();
+    showToast('Icerik guncellendi');
+    loadScreensContent();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+var _allowedMediaTypes = ['image/jpeg','image/png','image/gif','image/webp','image/svg+xml','video/mp4','video/webm'];
+var _maxMediaSize = Infinity;
+var _allowedImageTypes = ['image/jpeg','image/png','image/gif','image/webp','image/svg+xml'];
+var _maxImageSize = Infinity;
 
 async function uploadMediaFile(input) {
   if (!input.files || input.files.length === 0) return;
   const file = input.files[0];
+  if (!_allowedMediaTypes.includes(file.type)) {
+    input.value = ''; return showToast('Desteklenmeyen dosya tipi. Resim veya video yükleyin.', 'error');
+  }
+  if (file.size > _maxMediaSize) {
+    input.value = ''; return showToast('Dosya boyutu çok büyük.', 'error');
+  }
   const formData = new FormData();
   formData.append('media', file);
   formData.append('title', file.name);
 
-  showToast('Dosya yükleniyor...', 'info');
+  const companyId = document.getElementById('media-upload-company')?.value;
+  if (companyId) formData.append('company_id', companyId);
+
+  showToast('Dosya yukleniyor...', 'info');
   try {
     await api.uploadContent(formData);
-    showToast('Medya başarıyla yüklendi');
+    showToast('Medya basariyla yuklendi');
     loadScreensContent();
   } catch(e) { showToast(e.message, 'error'); }
   input.value = '';
 }
 
 async function deleteContent(id) {
-  if (!confirm('Bu içeriği silmek istediğinize emin misiniz?')) return;
+  if (!confirm('Bu icerigi silmek istediginize emin misiniz?')) return;
   await api.deleteContent(id);
-  showToast('İçerik silindi'); loadScreensContent();
+  showToast('Icerik silindi'); loadScreensContent();
+}
+
+// ── TICKER (Kayan Yazı) Yönetimi ──────────────────────────
+async function loadTickerMessages() {
+  const container = document.getElementById('ticker-rows-container');
+  if (!container) return;
+  try {
+    const s = await api.getSettings();
+    const tickerValue = s.ticker_text ? (s.ticker_text.value || '') : '';
+    const msgs = tickerValue.split('|').map(m => m.trim()).filter(Boolean);
+    container.innerHTML = '';
+    if (msgs.length === 0) {
+      addTickerRow();
+    } else {
+      msgs.forEach(m => addTickerRow(m));
+    }
+  } catch (e) {
+    console.warn('Ticker load error', e);
+    container.innerHTML = '';
+    addTickerRow();
+  }
+}
+
+function addTickerRow(text) {
+  const container = document.getElementById('ticker-rows-container');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px';
+  row.innerHTML = `
+    <span style="cursor:grab;color:var(--text-3);font-size:16px" title="Sirala">⠿</span>
+    <input type="text" class="form-input ticker-msg-input" value="${esc(text || '')}" placeholder="Kayan yazı metni girin..." style="flex:1">
+    <button class="btn-text" style="color:var(--text-3)" onclick="moveTickerRow(this,-1)" title="Yukari">▲</button>
+    <button class="btn-text" style="color:var(--text-3)" onclick="moveTickerRow(this,1)" title="Asagi">▼</button>
+    <button class="btn-text" style="color:var(--red);font-size:16px" onclick="removeTickerRow(this)" title="Sil">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeTickerRow(btn) {
+  const row = btn.closest('div');
+  const container = document.getElementById('ticker-rows-container');
+  if (container && container.children.length <= 1) {
+    return showToast('En az bir kayan yazı satiri olmali', 'error');
+  }
+  row.remove();
+}
+
+function moveTickerRow(btn, direction) {
+  const row = btn.closest('div');
+  const container = row.parentElement;
+  if (direction === -1 && row.previousElementSibling) {
+    container.insertBefore(row, row.previousElementSibling);
+  } else if (direction === 1 && row.nextElementSibling) {
+    container.insertBefore(row.nextElementSibling, row);
+  }
+}
+
+let _saveTickerBusy = false;
+async function saveTickerMessages() {
+  if (_saveTickerBusy) return;
+  _saveTickerBusy = true;
+  try {
+    const inputs = document.querySelectorAll('#ticker-rows-container .ticker-msg-input');
+    const msgs = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+    if (msgs.length === 0) {
+      _saveTickerBusy = false;
+      return showToast('En az bir kayan yazı mesaji girin', 'error');
+    }
+    const tickerText = msgs.join(' | ');
+    await api.updateSettings({ ticker_text: tickerText });
+    showToast('Kayan yazılar kaydedildi');
+  } catch (e) { showToast(e.message, 'error'); }
+  _saveTickerBusy = false;
 }
 
 // ── LOBİ AYARLARI (Admin) ──────────────────────────────
@@ -380,9 +558,16 @@ async function saveSettingsAlt() {
 async function uploadLobbyLogo() {
   const fileEl = document.getElementById('lobby-logo-file');
   if (!fileEl.files || !fileEl.files[0]) return showToast('Lütfen logo dosyası seçin', 'error');
+  var logoFile = fileEl.files[0];
+  if (!_allowedImageTypes.includes(logoFile.type)) {
+    fileEl.value = ''; return showToast('Sadece resim dosyası yükleyebilirsiniz (JPEG, PNG, GIF, WebP, SVG).', 'error');
+  }
+  if (logoFile.size > _maxImageSize) {
+    fileEl.value = ''; return showToast('Logo dosyası 5MB\'dan büyük olamaz.', 'error');
+  }
 
   const formData = new FormData();
-  formData.append('media', fileEl.files[0]);
+  formData.append('media', logoFile);
   formData.append('type', 'image');
   formData.append('title', 'Lobby Logo');
 
@@ -413,14 +598,14 @@ async function loadSystemLogs() {
             const color = l.level === 'error' ? 'var(--red)' : (l.level === 'warn' ? 'var(--orange)' : 'inherit');
             return `<tr style="border-bottom:1px solid #eee; color:${color}">
               <td style="padding:8px; white-space:nowrap">${new Date(l.created_at).toLocaleString('tr-TR')}</td>
-              <td style="text-transform:uppercase; font-weight:700">${l.level}</td>
-              <td>${l.module || '-'}</td>
-              <td title="${l.details || ''}">${l.message}</td>
+              <td style="text-transform:uppercase; font-weight:700">${esc(l.level)}</td>
+              <td>${esc(l.module) || '-'}</td>
+              <td title="${esc(l.details) || ''}">${esc(l.message)}</td>
             </tr>`;
           }).join('')}
         </tbody>
       </table>`;
-  } catch(e) { listEl.innerHTML = '<div class="error">Loglar yüklenemedi: ' + e.message + '</div>'; }
+  } catch(e) { listEl.innerHTML = '<div class="error">Loglar yüklenemedi: ' + esc(e.message) + '</div>'; }
 }
 
 async function showCompanyModal(id = null) {
@@ -433,6 +618,16 @@ async function showCompanyModal(id = null) {
     <div style="display:grid;gap:14px">
       <div class="form-group"><label>Şirket Adı *</label><input type="text" id="co-name" class="form-input" value="${c.name}"/></div>
       <div class="form-group"><label>Temo Rengi (Karşılama Yazısı Rengi)</label><input type="color" id="co-color" class="form-input" value="${c.theme_color}" style="height:44px"/></div>
+      ${id ? `<div class="form-group">
+        <label>Şirket Logosu</label>
+        <div style="display:flex;align-items:center;gap:12px">
+          ${c.logo_path ? `<img src="${c.logo_path}" style="width:48px;height:48px;object-fit:contain;border-radius:6px;background:#fff;padding:4px;border:1px solid #ddd" />` : '<span style="color:#999;font-size:12px">Logo yok</span>'}
+          <label class="btn-secondary btn-sm" style="cursor:pointer;margin:0">
+            Logo Yükle
+            <input type="file" id="co-logo-file" accept="image/*" style="display:none" onchange="uploadCompanyLogo(${id})" />
+          </label>
+        </div>
+      </div>` : ''}
       <div class="form-row">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
           <input type="checkbox" id="co-active" ${c.is_active?'checked':''} /> Aktif
@@ -448,7 +643,14 @@ async function showCompanyModal(id = null) {
     </div>`);
 }
 
+let _saveCompanyBusy = false;
 async function saveCompany(id) {
+  if (_saveCompanyBusy) return;
+  _saveCompanyBusy = true;
+  try { await _doSaveCompany(id); } finally { _saveCompanyBusy = false; }
+}
+
+async function _doSaveCompany(id) {
   const body = {
     name: document.getElementById('co-name').value,
     theme_color: document.getElementById('co-color').value,
@@ -460,6 +662,34 @@ async function saveCompany(id) {
     if (id) await api.updateCompany(id, body);
     else await api.createCompany(body);
     closeModal(); showToast('Şirket kaydedildi'); loadSettings();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function uploadCompanyLogo(companyId) {
+  const input = document.getElementById('co-logo-file');
+  if (!input || !input.files.length) return;
+  var coLogoFile = input.files[0];
+  if (!_allowedImageTypes.includes(coLogoFile.type)) {
+    input.value = ''; return showToast('Sadece resim dosyası yükleyebilirsiniz (JPEG, PNG, GIF, WebP, SVG).', 'error');
+  }
+  if (coLogoFile.size > _maxImageSize) {
+    input.value = ''; return showToast('Logo dosyası 5MB\'dan büyük olamaz.', 'error');
+  }
+  const fd = new FormData();
+  fd.append('logo', coLogoFile);
+  try {
+    const token = sessionStorage.getItem('vd_token');
+    const resp = await fetch(`/api/companies/${companyId}/logo`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd,
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Logo yüklenemedi');
+    showToast('Logo yüklendi');
+    closeModal();
+    loadCompaniesList();
+    showCompanyModal(companyId);
   } catch (e) { showToast(e.message, 'error'); }
 }
 

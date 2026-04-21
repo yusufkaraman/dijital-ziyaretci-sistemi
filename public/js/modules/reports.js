@@ -12,7 +12,7 @@ async function loadReports() {
     topHosts.map(([name, count], i) => `
       <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:18px">${['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
-        <div style="flex:1"><div style="font-weight:600">${name}</div></div>
+        <div style="flex:1"><div style="font-weight:600">${esc(name)}</div></div>
         <span style="font-weight:700;color:var(--primary)">${count}</span>
       </div>`).join('') : '<div class="empty-state">Veri yok</div>';
 }

@@ -13,7 +13,7 @@ function requirePermission(checkFn, message) {
 }
 
 function canManageUsers(role) {
-  return role === 'admin' || role === 'secretary';
+  return role === 'admin' || role === 'manager' || role === 'secretary';
 }
 
 function canSecretaryManageRole(role) {
@@ -65,7 +65,7 @@ function canAssignSelfAsHost(role) {
 }
 
 function canAutoApproveVisitor(role) {
-  return role === 'admin' || role === 'manager' || role === 'secretary';
+  return role === 'admin' || role === 'manager';
 }
 
 module.exports = {

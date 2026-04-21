@@ -36,7 +36,11 @@
     }
 
     try {
-      await window.api.changePassword({ current_password: currentPassword, new_password: newPassword });
+      const apiClient = window.api || (typeof api !== 'undefined' ? api : null);
+      if (!apiClient || typeof apiClient.changePassword !== 'function') {
+        throw new Error('Sifre degistirme servisi hazir degil');
+      }
+      await apiClient.changePassword({ current_password: currentPassword, new_password: newPassword });
       window.vdCloseModal();
       window.vdShowToast('Sifreniz basariyla guncellendi.');
     } catch (e) {

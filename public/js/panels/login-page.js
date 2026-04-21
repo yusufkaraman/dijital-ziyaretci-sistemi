@@ -54,11 +54,4 @@ async function doLogin(e) {
   }
 }
 
-function quickLogin(user, pass) {
-  document.getElementById('username').value = user;
-  document.getElementById('password').value = pass;
-  document.getElementById('login-form').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-}
-
 window.doLogin = doLogin;
-window.quickLogin = quickLogin;

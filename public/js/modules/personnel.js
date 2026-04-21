@@ -1,9 +1,16 @@
 ﻿// ── PERSONEL ──────────────────────────────────────────
+let personnelUserSearch = '';
+let personnelUserSearchTimer = null;
+let personnelLoadVersion = 0;
+
 async function loadPersonnel() {
-  const personnel = await api.getPersonnel({ active_only: 'false' });
+  const currentLoadVersion = ++personnelLoadVersion;
   const grid = document.getElementById('hosts-grid');
+  if (!grid) return;
   const filtersWrap = document.getElementById('personnel-company-filters');
+  const junkSection = document.getElementById('junk-users-section');
   const user = getUser();
+  const isAdmin = Boolean(user && user.role === 'admin');
   const isAdminOrManager = window.vdPermissions
     ? window.vdPermissions.canManagePersonnel(user)
     : Boolean(user && (user.role === 'admin' || user.role === 'manager'));
@@ -12,23 +19,34 @@ async function loadPersonnel() {
     : Boolean(user && user.role === 'secretary');
   const hostsActionBtn = document.getElementById('hosts-primary-action');
 
-  if (hostsActionBtn) {
-    if (isSecretary) {
+  // Sekreter, yönetici ve admin kullanıcı yönetim görünümünü kullansın
+  if (isSecretary || isAdminOrManager) {
+    if (hostsActionBtn) {
       hostsActionBtn.setAttribute('onclick', 'showUserModal()');
       hostsActionBtn.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Yeni Kullanıcı`;
-    } else {
-      hostsActionBtn.setAttribute('onclick', 'showHostModal()');
-      hostsActionBtn.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Personel Ekle`;
     }
-  }
 
-  if (isSecretary) {
-    const allUsers = await api.getUsers({ all_roles: 'true' });
+    const previousSearchInput = filtersWrap ? filtersWrap.querySelector('input[type="search"]') : null;
+    const shouldRestoreSearchFocus = Boolean(previousSearchInput && document.activeElement === previousSearchInput);
+    const previousSelectionStart = shouldRestoreSearchFocus ? previousSearchInput.selectionStart : null;
+    const previousSelectionEnd = shouldRestoreSearchFocus ? previousSearchInput.selectionEnd : null;
+
+    const [allUsers, allPersonnel] = await Promise.all([
+      api.getUsers({ all_roles: 'true', include_inactive: isAdmin ? 'true' : undefined }),
+      api.getPersonnel({ active_only: 'false' }),
+    ]);
+    if (currentLoadVersion !== personnelLoadVersion) return;
+
     const users = allUsers.filter((u) => u.is_active);
+    const junkUsers = isAdmin
+      ? allUsers.filter((u) => !u.is_active || !u.has_active_personnel)
+      : [];
+    const junkPersonnel = isAdmin
+      ? allPersonnel.filter((p) => !p.is_active)
+      : [];
+    const searchTerm = (personnelUserSearch || '').trim().toLowerCase();
     const companyNames = collectUniqueCompanyNames(users, (u) => u.company_name);
 
     if (personnelCompanyFilter !== 'all' && !companyNames.includes(personnelCompanyFilter)) {
@@ -37,6 +55,18 @@ async function loadPersonnel() {
 
     if (filtersWrap) {
       filtersWrap.innerHTML = '';
+      const searchWrap = document.createElement('div');
+      searchWrap.style.cssText = 'flex:1 1 240px;min-width:220px;';
+      searchWrap.innerHTML = `
+        <input
+          type="search"
+          class="form-input"
+          placeholder="Username ile ara..."
+          value="${esc(personnelUserSearch)}"
+          oninput="setPersonnelUserSearch(this.value)"
+          style="width:100%"
+        />`;
+      filtersWrap.appendChild(searchWrap);
       const allNames = ['all'].concat(companyNames);
       allNames.forEach((companyName) => {
         const isAll = companyName === 'all';
@@ -49,11 +79,28 @@ async function loadPersonnel() {
         btn.addEventListener('click', () => setPersonnelCompanyFilter(companyName));
         filtersWrap.appendChild(btn);
       });
+
+      if (shouldRestoreSearchFocus) {
+        const nextSearchInput = filtersWrap.querySelector('input[type="search"]');
+        if (nextSearchInput) {
+          nextSearchInput.focus({ preventScroll: true });
+          if (previousSelectionStart !== null && previousSelectionEnd !== null) {
+            nextSearchInput.setSelectionRange(previousSelectionStart, previousSelectionEnd);
+          }
+        }
+      }
     }
 
-    const filteredUsers = personnelCompanyFilter === 'all'
+    let filteredUsers = personnelCompanyFilter === 'all'
       ? users
       : users.filter((u) => normalizeCompanyName(u.company_name) === normalizeCompanyName(personnelCompanyFilter));
+    if (searchTerm) {
+      filteredUsers = filteredUsers.filter((u) => {
+        const username = String(u.username || '').toLowerCase();
+        const fullName = String(u.full_name || '').toLowerCase();
+        return username.includes(searchTerm) || fullName.includes(searchTerm);
+      });
+    }
 
     const roleMap = {
       admin: 'Admin',
@@ -65,17 +112,102 @@ async function loadPersonnel() {
     grid.innerHTML = filteredUsers.length ? filteredUsers.map((u) => `
       <div class="personnel-card ${u.is_active ? '' : 'inactive'}" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;position:relative">
         ${!u.is_active ? '<span style="position:absolute;top:10px;right:10px;font-size:10px;background:#ef4444;color:#fff;padding:2px 6px;border-radius:4px">PASİF</span>' : ''}
-        <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;margin:0 auto 12px">${(u.full_name || '?')[0]}</div>
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px">${u.full_name || '—'}</div>
-        <div style="font-size:12px;color:var(--primary);margin-bottom:4px">${roleMap[u.role] || u.role || '—'}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${u.company_name || 'Şirket bilgisi yok'}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${u.department || 'Departman yok'}</div>
+        <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;margin:0 auto 12px">${esc((u.full_name || '?')[0])}</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">${esc(u.full_name) || '—'}</div>
+        <div style="font-size:12px;color:var(--primary);margin-bottom:4px">${esc(roleMap[u.role] || u.role) || '—'}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${esc(u.company_name) || 'Şirket bilgisi yok'}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${esc(u.department) || 'Departman yok'}</div>
         <div style="display:flex;gap:8px;margin-top:16px;justify-content:center">
           <button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="showUserModal(${u.id})">Düzenle</button>
           <button class="btn-text" style="color:#ef4444;font-size:11px" onclick="deleteUser(${u.id})">Sil</button>
         </div>
       </div>`).join('') : '<div class="empty-state">Kullanıcı bulunamadı</div>';
+    if (junkSection) {
+      let filteredJunkUsers = junkUsers;
+      let filteredJunkPersonnel = junkPersonnel;
+      if (searchTerm) {
+        filteredJunkUsers = filteredJunkUsers.filter((u) => {
+          const username = String(u.username || '').toLowerCase();
+          const fullName = String(u.full_name || '').toLowerCase();
+          return username.includes(searchTerm) || fullName.includes(searchTerm);
+        });
+        filteredJunkPersonnel = filteredJunkPersonnel.filter((p) => {
+          const fullName = String(p.full_name || '').toLowerCase();
+          const companyName = String(p.company_name || '').toLowerCase();
+          return fullName.includes(searchTerm) || companyName.includes(searchTerm);
+        });
+      }
+      if (!isAdmin || (!filteredJunkUsers.length && !filteredJunkPersonnel.length)) {
+        junkSection.style.display = 'none';
+        junkSection.innerHTML = '';
+      } else {
+        junkSection.style.display = 'block';
+        junkSection.innerHTML = `
+          <div style="border:1px dashed #fca5a5;border-radius:14px;padding:16px;background:linear-gradient(135deg,#fff 0%,#fff6f6 100%)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+              <div>
+                <div style="font-weight:800;font-size:15px;color:var(--text-1)">Arşiv / Junk Kullanıcılar</div>
+                <div style="font-size:12px;color:var(--text-3)">Pasif kayıtlar ve aktif personel bağlantısı kalmamış kullanıcılar burada listelenir.</div>
+              </div>
+              <span class="status-badge status-left">${filteredJunkUsers.length + filteredJunkPersonnel.length} kayıt</span>
+            </div>
+            <div style="display:grid;gap:10px">
+              ${filteredJunkUsers.map((u) => {
+                const reason = !u.is_active ? 'Pasif kullanıcı' : 'Aktif personel bağlantısı yok';
+                return `
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid #fecaca;background:#fff;border-radius:12px">
+                    <div style="min-width:0;flex:1 1 260px">
+                      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+                        <strong>${esc(u.full_name || '—')}</strong>
+                        <code>${esc(u.username || '—')}</code>
+                        <span class="status-badge status-left">${esc(reason)}</span>
+                      </div>
+                      <div style="font-size:12px;color:var(--text-3)">
+                        Rol: ${esc(roleMap[u.role] || u.role)} · Şirket: ${esc(u.company_name || 'Yok')} · Departman: ${esc(u.department || 'Yok')}
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                      ${!u.is_active ? `<button class="btn-secondary" style="font-size:11px;padding:6px 10px" onclick="restoreUser(${u.id})">Geri Etkinleştir</button>` : ''}
+                      <button class="btn-text" style="color:#ef4444;font-size:11px" onclick="purgeUser(${u.id})">Kalıcı Sil</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+              ${filteredJunkPersonnel.map((p) => `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid #fde68a;background:#fffdf5;border-radius:12px">
+                  <div style="min-width:0;flex:1 1 260px">
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+                      <strong>${esc(p.full_name || '—')}</strong>
+                      <span class="status-badge status-left">Pasif personel kaydı</span>
+                    </div>
+                    <div style="font-size:12px;color:var(--text-3)">
+                      Şirket: ${esc(p.company_name || 'Yok')} · Ünvan: ${esc(p.title || 'Yok')} · Departman: ${esc(p.department || 'Yok')}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+    }
     return;
+  }
+
+  if (junkSection) {
+    junkSection.style.display = 'none';
+    junkSection.innerHTML = '';
+  }
+
+  // Diğer roller için basit personel görünümü
+  const personnel = await api.getPersonnel({ active_only: 'false' });
+  if (currentLoadVersion !== personnelLoadVersion) return;
+
+  if (hostsActionBtn) {
+    hostsActionBtn.setAttribute('onclick', 'showHostModal()');
+    hostsActionBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Personel Ekle`;
   }
 
   const companyNames = collectUniqueCompanyNames(personnel, (p) => p.company_name);
@@ -107,18 +239,12 @@ async function loadPersonnel() {
   grid.innerHTML = filteredPersonnel.length ? filteredPersonnel.map(p => `
     <div class="personnel-card ${p.is_active ? '' : 'inactive'}" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;position:relative">
       ${!p.is_active ? '<span style="position:absolute;top:10px;right:10px;font-size:10px;background:#ef4444;color:#fff;padding:2px 6px;border-radius:4px">PASİF</span>' : ''}
-      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;margin:0 auto 12px">${p.full_name[0]}</div>
-      <div style="font-weight:700;font-size:15px;margin-bottom:4px">${p.full_name}</div>
-      <div style="font-size:12px;color:var(--primary);margin-bottom:4px">${p.title||'—'}</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${p.company_name||''}</div>
-      ${p.phone ? `<div style="font-size:12px;color:var(--text-muted)">📞 ${p.phone}</div>` : ''}
-      ${p.email ? `<div style="font-size:12px;color:var(--text-muted)">✉️ ${p.email}</div>` : ''}
-      ${isAdminOrManager ? `
-        <div style="display:flex;gap:8px;margin-top:16px;justify-content:center">
-          <button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="showHostModal(${p.id})">Düzenle</button>
-          ${(window.vdPermissions ? window.vdPermissions.canDeletePersonnel(user) : false) ? `<button class="btn-text" style="color:#ef4444;font-size:11px" onclick="deleteHost(${p.id})">Sil</button>` : ''}
-        </div>
-      ` : ''}
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;margin:0 auto 12px">${esc(p.full_name[0])}</div>
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px">${esc(p.full_name)}</div>
+      <div style="font-size:12px;color:var(--primary);margin-bottom:4px">${esc(p.title)||'—'}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${esc(p.company_name)||''}</div>
+      ${p.phone ? `<div style="font-size:12px;color:var(--text-muted)">📞 ${esc(p.phone)}</div>` : ''}
+      ${p.email ? `<div style="font-size:12px;color:var(--text-muted)">✉️ ${esc(p.email)}</div>` : ''}
     </div>`).join('') : '<div class="empty-state">Personel bulunamadı</div>';
 }
 
@@ -129,18 +255,18 @@ async function showHostModal(id = null) {
   showModal(id ? 'Personel Düzenle' : 'Yeni Personel', `
     <div style="display:grid;gap:14px">
       <div class="form-row">
-        <div class="form-group"><label>Ad Soyad *</label><input type="text" id="ph-name" class="form-input" value="${p.full_name}"/></div>
-        <div class="form-group"><label>Ünvan</label><input type="text" id="ph-title" class="form-input" value="${p.title||''}"/></div>
+        <div class="form-group"><label>Ad Soyad *</label><input type="text" id="ph-name" class="form-input" value="${esc(p.full_name)}"/></div>
+        <div class="form-group"><label>Ünvan</label><input type="text" id="ph-title" class="form-input" value="${esc(p.title)||''}"/></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Firma *</label>
-          <input type="text" id="ph-company" class="form-input" value="${p.company_name||''}" placeholder="Şirket adı yazın..."/>
+          <input type="text" id="ph-company" class="form-input" value="${esc(p.company_name)||''}" placeholder="Şirket adı yazın..."/>
         </div>
-        <div class="form-group"><label>Departman</label><input type="text" id="ph-dept" class="form-input" value="${p.department||''}"/></div>
+        <div class="form-group"><label>Departman</label><input type="text" id="ph-dept" class="form-input" value="${esc(p.department)||''}"/></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Telefon</label><input type="text" id="ph-phone" class="form-input" value="${p.phone||''}"/></div>
-        <div class="form-group"><label>E-posta</label><input type="email" id="ph-email" class="form-input" value="${p.email||''}"/></div>
+        <div class="form-group"><label>Telefon</label><input type="text" id="ph-phone" class="form-input" value="${esc(p.phone)||''}"/></div>
+        <div class="form-group"><label>E-posta</label><input type="email" id="ph-email" class="form-input" value="${esc(p.email)||''}"/></div>
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -149,7 +275,7 @@ async function showHostModal(id = null) {
       </div>
       <div class="form-actions">
         <button class="btn-secondary" onclick="closeModal()">İptal</button>
-        <button class="btn-primary" onclick="saveHost(${id})">Kaydet</button>
+        <button class="btn-primary" onclick="withButtonLock(this, function(){ return saveHost(${id}) })">Kaydet</button>
       </div>
     </div>`);
 }
@@ -178,5 +304,40 @@ async function deleteHost(id) {
     await api.deletePersonnel(id);
     showToast('Personel silindi'); loadPersonnel();
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteUser(id) {
+  if (!confirm('Bu kullanıcıyı silmek istediğinize emin misiniz? (Pasif duruma getirilecektir)')) return;
+  try {
+    await api.deleteUser(id);
+    showToast('Kullanıcı silindi');
+    await loadPersonnel();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function restoreUser(id) {
+  if (!confirm('Bu kullanıcı yeniden aktif hale getirilsin mi?')) return;
+  try {
+    await api.updateUser(id, { is_active: 1 });
+    showToast('Kullanıcı yeniden aktif edildi');
+    await loadPersonnel();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function purgeUser(id) {
+  if (!confirm('Bu junk kullanıcı kalıcı olarak silinsin mi? Bu işlem geri alınamaz ve kullanıcı adı yeniden kullanılabilir hale gelir.')) return;
+  try {
+    await api.purgeUser(id);
+    showToast('Junk kullanıcı kalıcı olarak silindi');
+    await loadPersonnel();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function setPersonnelUserSearch(value) {
+  personnelUserSearch = value || '';
+  if (personnelUserSearchTimer) clearTimeout(personnelUserSearchTimer);
+  personnelUserSearchTimer = setTimeout(() => {
+    loadPersonnel();
+  }, 120);
 }
 

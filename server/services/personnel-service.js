@@ -1,15 +1,31 @@
+const prisma = require('../prisma');
 const { normalizeManagerPersonnelRecord: normalizeManagerPersonnelFromAuth } = require('./auth-service');
 
-function getOrCreateCompany(db, name) {
+/**
+ * Verilen isimde şirket varsa id'sini döndürür, yoksa oluşturur.
+ * Plan §4.8: personnel-service legacy coupling korunmalı.
+ */
+async function getOrCreateCompany(name) {
   if (!name) return null;
-  const existing = db.prepare('SELECT id FROM companies WHERE name=?').get(name);
+  const existing = await prisma.company.findFirst({
+    where: { name },
+    select: { id: true },
+  });
   if (existing) return existing.id;
-  const created = db.prepare('INSERT INTO companies (name) VALUES (?)').run(name);
-  return created.lastInsertRowid;
+
+  const created = await prisma.company.create({
+    data: { name },
+    select: { id: true },
+  });
+  return created.id;
 }
 
-function normalizeManagerPersonnelRecord(db) {
-  normalizeManagerPersonnelFromAuth(db);
+/**
+ * Müdür personel kaydını normalize eder.
+ * auth-service'teki Prisma versiyonuna delege eder.
+ */
+async function normalizeManagerPersonnelRecord() {
+  await normalizeManagerPersonnelFromAuth(prisma);
 }
 
 module.exports = {

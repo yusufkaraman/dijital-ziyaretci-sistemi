@@ -1,4 +1,28 @@
-node_modules
 node_modules/
 server/uploads/
+public/Assets/
+public/favicon.ico
 .env
+.env.aciklamali
+
+# Deploy paketleri ve veritabani yedekleri
+*.tar.gz
+*.sql
+
+# Yerel arayuz/ajan ayarlari
+.claude/
+
+# SQLite (legacy — yalnızca importer.js tarafından kaynak olarak kullanılır)
+server/database.db
+
+# Prisma generate çıktısı — prisma generate ile yeniden oluşturulur
+prisma/generated-client/
+
+# Test çalışmalarından kalan geçici klasörler
+tests/.tmp-*/
+
+# OS & editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.log

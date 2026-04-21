@@ -1,45 +1,45 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const bcrypt = require('bcryptjs');
 const request = require('supertest');
 
-const TEST_ROOT = path.join(__dirname, '.tmp-test-runtime');
-process.env.DB_PATH = path.join(TEST_ROOT, 'database.test.db');
-process.env.UPLOAD_PATH = path.join(TEST_ROOT, 'uploads');
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
+// ── Test ortamı: PostgreSQL (TEST_DATABASE_URL veya DATABASE_URL) ─────────
+// Geliştirme DB'sinden izole etmek için TEST_DATABASE_URL kullanılır.
+// CI ortamında TEST_DATABASE_URL environment variable olarak enjekte edilmelidir.
+if (process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+}
+if (process.env.TEST_DIRECT_URL) {
+  process.env.DIRECT_URL = process.env.TEST_DIRECT_URL;
+}
+
+process.env.UPLOAD_PATH = process.env.UPLOAD_PATH || require('path').join(__dirname, '.tmp-test-uploads');
+process.env.JWT_SECRET  = process.env.JWT_SECRET  || 'test-secret-key';
 process.env.ALLOWED_ORIGINS = '*';
 
-if (fs.existsSync(TEST_ROOT)) {
-  fs.rmSync(TEST_ROOT, { recursive: true, force: true });
-}
-fs.mkdirSync(TEST_ROOT, { recursive: true });
-
-const { initDB, db } = require('../server/database');
+const prisma = require('../server/prisma');
 const { app } = require('../server/index');
 
-let adminToken = '';
-let managerToken = '';
+let adminToken     = '';
+let managerToken   = '';
 let secretaryToken = '';
 
 const state = {
-  personnelId: null,
-  companyId: null,
-  roomId: null,
-  contentId: null,
+  personnelId:   null,
+  companyId:     null,
+  roomId:        null,
+  contentId:     null,
   appointmentId: null,
-  visitorIdA: null,
-  visitorIdB: null,
-  visitorIdC: null,
-  blacklistId: null,
+  visitorIdA:    null,
+  visitorIdB:    null,
+  visitorIdC:    null,
+  blacklistId:   null,
 };
 
 async function login(username, password) {
   const res = await request(app)
     .post('/api/auth/login')
     .send({ username, password });
-
   assert.equal(res.status, 200);
   assert.ok(res.body.token);
   return res.body.token;
@@ -54,12 +54,17 @@ async function timedGet(url, token) {
   return { res, durationMs };
 }
 
+// ── Test DB bootstrap ─────────────────────────────────────────────────────
 test('bootstrap test database and seed data', async () => {
-  await initDB();
-  require('../server/seed-auto');
+  // Test başlamadan önce test tablolarını temizle (test izolasyonu)
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE screen_logs, activity_logs, appointments, visitors, room_reservations, blacklist, contents, system_settings, personnel, rooms, companies, users, push_subscriptions, system_logs RESTART IDENTITY CASCADE');
 
-  adminToken = await login('admin', 'admin123');
-  managerToken = await login('mudur', 'mudur123');
+  // Seed verisi yükle
+  const { seed } = require('../server/seed-test');
+  await seed();
+
+  adminToken     = await login('admin', 'admin123');
+  managerToken   = await login('mudur', 'mudur123');
   secretaryToken = await login('sekreter', 'sekreter123');
 
   assert.ok(adminToken.length > 10);
@@ -135,38 +140,19 @@ test('secretary can create secretary and personnel users only', async () => {
   const denyNonPersonnel = await request(app)
     .post('/api/users')
     .set('Authorization', `Bearer ${secretaryToken}`)
-    .send({
-      username: 'sec-manager-denied',
-      password: '12345678',
-      full_name: 'Denied Manager',
-      role: 'manager',
-      department: 'Ops',
-    });
+    .send({ username: 'sec-manager-denied', password: '12345678', full_name: 'Denied Manager', role: 'manager', department: 'Ops' });
   assert.equal(denyNonPersonnel.status, 403);
 
   const weakPassword = await request(app)
     .post('/api/users')
     .set('Authorization', `Bearer ${secretaryToken}`)
-    .send({
-      username: 'sec-personel-weak',
-      password: '1234567',
-      full_name: 'Weak Password',
-      role: 'personnel',
-      department: 'Ops',
-    });
+    .send({ username: 'sec-personel-weak', password: '1234567', full_name: 'Weak Password', role: 'personnel', department: 'Ops' });
   assert.equal(weakPassword.status, 400);
 
   const createPersonnel = await request(app)
     .post('/api/users')
     .set('Authorization', `Bearer ${secretaryToken}`)
-    .send({
-      username: 'sec-personel-ok',
-      password: '12345678',
-      full_name: 'Sekreter Personel',
-      role: 'personnel',
-      company_id: 1,
-      department: 'Ops',
-    });
+    .send({ username: 'sec-personel-ok', password: '12345678', full_name: 'Sekreter Personel', role: 'personnel', company_id: 1, department: 'Ops' });
   assert.equal(createPersonnel.status, 200);
 
   const personnelAfterCreate = await request(app)
@@ -179,14 +165,7 @@ test('secretary can create secretary and personnel users only', async () => {
   const createSecretary = await request(app)
     .post('/api/users')
     .set('Authorization', `Bearer ${secretaryToken}`)
-    .send({
-      username: 'sec-secretary-ok',
-      password: '12345678',
-      full_name: 'Sekreter Tarafindan Sekreter',
-      role: 'secretary',
-      company_id: 1,
-      department: 'Ops',
-    });
+    .send({ username: 'sec-secretary-ok', password: '12345678', full_name: 'Sekreter Tarafindan Sekreter', role: 'secretary', company_id: 1, department: 'Ops' });
   assert.equal(createSecretary.status, 200);
 
   const usersAfterSecretaryCreate = await request(app)
@@ -597,7 +576,6 @@ test('multi-company personnel data supports autocomplete flow', async () => {
   assert.equal(autoRows.length, 2);
   assert.equal(autoRows.every((p) => typeof p.company_name === 'string' && p.company_name.length > 0), true);
 
-  // Frontend autocomplete is text+suggestion based: API must provide name + company label data.
   const suggestionRows = autoRows.map((p) => ({ full_name: p.full_name, company_name: p.company_name }));
   assert.equal(suggestionRows.some((r) => r.full_name === 'Autoco Personel A' && r.company_name), true);
   assert.equal(suggestionRows.some((r) => r.full_name === 'Autoco Personel B' && r.company_name), true);
@@ -612,14 +590,7 @@ test('manager cannot manage users and personnel user can change own password', a
   const createPersonnelUser = await request(app)
     .post('/api/users')
     .set('Authorization', `Bearer ${adminToken}`)
-    .send({
-      username: 'phase6-personel',
-      password: 'phase6pass1',
-      full_name: 'Phase6 Personel',
-      role: 'personnel',
-      company_id: 1,
-      department: 'Test',
-    });
+    .send({ username: 'phase6-personel', password: 'phase6pass1', full_name: 'Phase6 Personel', role: 'personnel', company_id: 1, department: 'Test' });
   assert.equal(createPersonnelUser.status, 200);
 
   const personnelToken = await login('phase6-personel', 'phase6pass1');
@@ -642,57 +613,134 @@ test('manager cannot manage users and personnel user can change own password', a
   assert.equal(relogin.status, 200);
 });
 
-test('400-user load and critical API response times are acceptable', async () => {
-  const userCountBefore = db.prepare(`SELECT COUNT(*) as c FROM users`).get().c;
-  const needed = Math.max(0, 400 - userCountBefore);
+// ── 400-kayıt performans testi (Prisma bulk insert) ───────────────────────
+test('soft-deleted personnel usernames can be reused and linked personnel becomes inactive', async () => {
+  const createOriginal = await request(app)
+    .post('/api/users')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({ username: 'reusable-personel', password: 'ReusePass1', full_name: 'Reusable Personel One', role: 'personnel', company_id: 1, department: 'Ops' });
+  assert.equal(createOriginal.status, 200);
 
-  if (needed > 0) {
-    const passHash = bcrypt.hashSync('PerfPass123', 10);
-    const insertUsers = db.prepare(`
-      INSERT INTO users (username, password_hash, full_name, role, department, is_active)
-      VALUES (?, ?, ?, 'personnel', 'Perf', 1)
-    `);
-    const insertPersonnel = db.prepare(`
-      INSERT INTO personnel (company_id, full_name, title, department, user_id, is_active)
-      VALUES (NULL, ?, 'Perf User', 'Perf', ?, 1)
-    `);
-    for (let i = 0; i < needed; i++) {
-      const uname = `perf-user-${Date.now()}-${i + 1}`;
-      const fullName = `Perf User ${i + 1}`;
-      const r = insertUsers.run(uname, passHash, fullName);
-      insertPersonnel.run(fullName, r.lastInsertRowid);
+  const originalUserId = createOriginal.body.id;
+
+  const originalPersonnel = await prisma.personnel.findFirst({
+    where: { userId: originalUserId },
+    select: { isActive: true },
+  });
+  assert.ok(originalPersonnel);
+  assert.equal(originalPersonnel.isActive, true);
+
+  const softDelete = await request(app)
+    .delete(`/api/users/${originalUserId}`)
+    .set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(softDelete.status, 200);
+
+  const archivedUser = await prisma.user.findUnique({
+    where: { id: originalUserId },
+    select: { username: true, isActive: true },
+  });
+  assert.ok(String(archivedUser.username || '').startsWith('deleted__'));
+  assert.equal(archivedUser.isActive, false);
+
+  const inactivePersonnel = await prisma.personnel.findFirst({
+    where: { userId: originalUserId },
+    select: { isActive: true },
+  });
+  assert.ok(inactivePersonnel);
+  assert.equal(inactivePersonnel.isActive, false);
+
+  const createReplacement = await request(app)
+    .post('/api/users')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({ username: 'reusable-personel', password: 'ReusePass2', full_name: 'Reusable Personel Two', role: 'personnel', company_id: 1, department: 'Ops' });
+  assert.equal(createReplacement.status, 200);
+  assert.notEqual(createReplacement.body.id, originalUserId);
+
+  const replacementLogin = await request(app)
+    .post('/api/auth/login')
+    .send({ username: 'reusable-personel', password: 'ReusePass2' });
+  assert.equal(replacementLogin.status, 200);
+});
+
+test('400-user load and critical API response times are acceptable', async () => {
+  const passHash = bcrypt.hashSync('PerfPass123', 10);
+
+  // Mevcut sayıları al
+  const userCount    = await prisma.user.count();
+  const visitorCount = await prisma.visitor.count();
+  const apptCount    = await prisma.appointment.count();
+
+  // ── 400 kullanıcı + personel ──────────────────────────────────────────
+  const neededUsers = Math.max(0, 400 - userCount);
+  if (neededUsers > 0) {
+    const userBatch = [];
+    for (let i = 0; i < neededUsers; i++) {
+      userBatch.push({
+        username:     `perf-user-${Date.now()}-${i + 1}`,
+        passwordHash: passHash,
+        fullName:     `Perf User ${i + 1}`,
+        role:         'personnel',
+        department:   'Perf',
+        isActive:     true,
+      });
     }
+    await prisma.user.createMany({ data: userBatch, skipDuplicates: true });
+
+    // İlk personeli bul (personnel referansı için)
+    const samplePersonnel = await prisma.personnel.findFirst({ where: { isActive: true }, select: { id: true, userId: true } });
+    const personnelBatch = userBatch.map((u, i) => ({
+      fullName:  u.fullName,
+      title:     'Perf User',
+      department:'Perf',
+      isActive:  true,
+    }));
+    await prisma.personnel.createMany({ data: personnelBatch, skipDuplicates: true });
   }
 
-  const personnelAny = db.prepare(`SELECT id, user_id, full_name FROM personnel WHERE is_active=1 ORDER BY id LIMIT 1`).get();
+  const personnelAny = await prisma.personnel.findFirst({ where: { isActive: true }, select: { id: true, userId: true } });
   assert.ok(personnelAny);
 
-  const visitorCountBefore = db.prepare(`SELECT COUNT(*) as c FROM visitors`).get().c;
-  const addVisitors = Math.max(0, 400 - visitorCountBefore);
-  if (addVisitors > 0) {
-    const insertVisitor = db.prepare(`
-      INSERT INTO visitors (full_name, company_name, host_personnel_id, host_user_id, reason, status, is_approved, created_by, created_at)
-      VALUES (?, ?, ?, ?, 'Perf Test', 'waiting', 1, ?, datetime('now','+3 hours'))
-    `);
-    for (let i = 0; i < addVisitors; i++) {
-      insertVisitor.run(`Perf Visitor ${i + 1}`, 'PERF CO', personnelAny.id, personnelAny.user_id || null, 1);
+  // ── 400 ziyaretçi ────────────────────────────────────────────────────
+  const neededVisitors = Math.max(0, 400 - visitorCount);
+  if (neededVisitors > 0) {
+    const visitorBatch = [];
+    for (let i = 0; i < neededVisitors; i++) {
+      visitorBatch.push({
+        fullName:        `Perf Visitor ${i + 1}`,
+        companyName:     'PERF CO',
+        hostPersonnelId: personnelAny.id,
+        hostUserId:      personnelAny.userId || null,
+        reason:          'Perf Test',
+        status:          'waiting',
+        isApproved:      true,
+        createdBy:       1,
+      });
     }
+    await prisma.visitor.createMany({ data: visitorBatch, skipDuplicates: true });
   }
 
-  const apptCountBefore = db.prepare(`SELECT COUNT(*) as c FROM appointments`).get().c;
-  const addAppts = Math.max(0, 400 - apptCountBefore);
-  if (addAppts > 0) {
-    const insertAppt = db.prepare(`
-      INSERT INTO appointments (visitor_name, visitor_company, host_personnel_id, host_user_id, reason, planned_time, status, created_by, created_at)
-      VALUES (?, 'PERF CO', ?, ?, 'Perf Appointment', ?, 'planned', ?, datetime('now','+3 hours'))
-    `);
-    for (let i = 0; i < addAppts; i++) {
-      const offsetHours = (i % 24) + 1;
-      const plannedTime = db.prepare(`SELECT datetime('now','+3 hours', ? || ' hours') as t`).get(offsetHours).t;
-      insertAppt.run(`Perf Appointment ${i + 1}`, personnelAny.id, personnelAny.user_id || null, plannedTime, 1);
+  // ── 400 randevu ───────────────────────────────────────────────────────
+  const neededAppts = Math.max(0, 400 - apptCount);
+  if (neededAppts > 0) {
+    const apptBatch = [];
+    const now = Date.now();
+    for (let i = 0; i < neededAppts; i++) {
+      const offsetMs = ((i % 24) + 1) * 60 * 60 * 1000;
+      apptBatch.push({
+        visitorName:     `Perf Appointment ${i + 1}`,
+        visitorCompany:  'PERF CO',
+        hostPersonnelId: personnelAny.id,
+        hostUserId:      personnelAny.userId || null,
+        reason:          'Perf Appointment',
+        plannedTime:     new Date(now + offsetMs),
+        status:          'planned',
+        createdBy:       1,
+      });
     }
+    await prisma.appointment.createMany({ data: apptBatch, skipDuplicates: true });
   }
 
+  // ── Performans ölçümü ─────────────────────────────────────────────────
   const usersPerf = await timedGet('/api/users?limit=200&offset=0', adminToken);
   assert.equal(usersPerf.res.status, 200);
   assert.equal(Array.isArray(usersPerf.res.body), true);
@@ -710,8 +758,8 @@ test('400-user load and critical API response times are acceptable', async () =>
   assert.equal(Array.isArray(appointmentsPerf.res.body), true);
 
   // Conservative thresholds for low-end CI machines.
-  assert.equal(usersPerf.durationMs < 2500, true, `users endpoint too slow: ${usersPerf.durationMs}ms`);
-  assert.equal(personnelPerf.durationMs < 2500, true, `personnel endpoint too slow: ${personnelPerf.durationMs}ms`);
-  assert.equal(visitorsPerf.durationMs < 2500, true, `visitors endpoint too slow: ${visitorsPerf.durationMs}ms`);
+  assert.equal(usersPerf.durationMs < 2500,       true, `users endpoint too slow: ${usersPerf.durationMs}ms`);
+  assert.equal(personnelPerf.durationMs < 2500,    true, `personnel endpoint too slow: ${personnelPerf.durationMs}ms`);
+  assert.equal(visitorsPerf.durationMs < 2500,     true, `visitors endpoint too slow: ${visitorsPerf.durationMs}ms`);
   assert.equal(appointmentsPerf.durationMs < 2500, true, `appointments endpoint too slow: ${appointmentsPerf.durationMs}ms`);
 });

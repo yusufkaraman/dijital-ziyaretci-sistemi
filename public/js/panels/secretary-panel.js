@@ -8,6 +8,7 @@ let personnelCache = [];
 let companyCache = [];
 let appointmentPersonnelCache = [];
 let appointmentCompanyFilter = 'all';
+let appointmentDateFilter = 'future';
 let personnelCompanyFilter = 'all';
 
 function normalizeCompanyName(value) {
@@ -46,30 +47,100 @@ function initSocket() {
         const msg = `🔔 Yeni giriş talebi: ${d.visitor.full_name}`;
         showToast(msg);
         showWindowsNotification('Yeni Misafir Kaydı', msg);
-        refreshDashboard();
+        refreshActivePage();
       },
       'visitor:arrived': (d) => {
         const msg = `✅ ${d.visitor.full_name} lobiye giriş yaptı`;
         showToast(msg);
         showWindowsNotification('Misafir Geldi', msg);
         playNotificationSound();
-        refreshDashboard();
+        refreshActivePage();
       },
       'visitor:approved': (d) => {
         showToast(`👔 ${d.visitor.full_name} onaylandı (${d.by})`);
-        refreshDashboard();
+        refreshActivePage();
       },
       'visitor:rejected': (d) => {
         showToast(`❌ ${d.reason ? d.reason : 'Giriş talebi reddedildi'} (${d.by})`, 'error');
-        refreshDashboard();
+        refreshActivePage();
       },
       'visitor:checkout': (d) => {
         showToast(`👋 ${d.visitor.full_name} çıkış yaptı`);
-        refreshDashboard();
+        refreshActivePage();
       },
       'visitor:cancelled': () => {
         showToast('Giriş kaydı iptal edildi');
-        refreshDashboard();
+        refreshActivePage();
+      },
+      'appointment:created': (d) => {
+        if (d && d.appointment && d.appointment.status === 'pending_approval') {
+          showToast('Yeni randevu onay talebi: ' + d.appointment.visitor_name);
+          showWindowsNotification('Randevu Onay Talebi', d.appointment.visitor_name + ' için randevu onayı bekliyor.');
+        }
+        refreshActivePage();
+      },
+      'appointment:approved': () => {
+        refreshActivePage();
+      },
+      'appointment:updated': () => {
+        refreshActivePage();
+      },
+      'appointment:cancelled': () => {
+        refreshActivePage();
+      },
+      'appointment:deleted': () => {
+        refreshActivePage();
+      },
+      'visitor:deleted': () => {
+        refreshActivePage();
+      },
+      'personnel:created': () => {
+        refreshActivePage();
+      },
+      'personnel:updated': () => {
+        refreshActivePage();
+      },
+      'personnel:deleted': () => {
+        refreshActivePage();
+      },
+      'blacklist:created': () => {
+        refreshActivePage();
+      },
+      'blacklist:deleted': () => {
+        refreshActivePage();
+      },
+      'room:created': () => {
+        refreshActivePage();
+      },
+      'room:updated': () => {
+        refreshActivePage();
+      },
+      'room:deleted': () => {
+        refreshActivePage();
+      },
+      'room:reserved': () => {
+        refreshActivePage();
+      },
+      'room:reservation_cancelled': () => {
+        refreshActivePage();
+      },
+      'user:created': () => {
+        refreshActivePage();
+      },
+      'user:updated': () => {
+        refreshActivePage();
+      },
+      'user:deleted': () => {
+        refreshActivePage();
+      },
+      'company:created': () => {
+        refreshActivePage();
+      },
+      'company:updated': () => {
+        refreshActivePage();
+      },
+      'company:deleted': () => {
+        refreshActivePage();
       },
     },
   });
@@ -107,6 +178,20 @@ const PAGE_TITLES = {
   settings: 'Sistem Ayarları'
 };
 
+const SECRETARY_ACTIVE_PAGE_STATE_KEY = 'panel-active-page';
+
+function persistActiveSecretaryPage(page) {
+  if (window.vdPageState && typeof window.vdPageState.set === 'function') {
+    window.vdPageState.set('active-page', page, SECRETARY_ACTIVE_PAGE_STATE_KEY);
+  }
+}
+
+function readPersistedSecretaryPage() {
+  if (!(window.vdPageState && typeof window.vdPageState.get === 'function')) return 'dashboard';
+  const page = window.vdPageState.get('active-page', 'dashboard', SECRETARY_ACTIVE_PAGE_STATE_KEY);
+  return PAGE_TITLES[page] ? page : 'dashboard';
+}
+
 function navigate(page) {
   const currentUser = getUser();
   if (page === 'settings' && window.vdPermissions && currentUser && !window.vdPermissions.canAccessSettingsTab(currentUser, 'companies')) {
@@ -121,6 +206,8 @@ function navigate(page) {
   const navEl = document.querySelector(`[data-page="${page}"]`);
   if (navEl) navEl.classList.add('active');
   document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  persistActiveSecretaryPage(page);
+  closeSidebar();
   loadPage(page);
 }
 
@@ -138,8 +225,33 @@ async function loadPage(page) {
   } catch (e) { showToast(e.message, 'error'); }
 }
 
+function refreshActivePage() {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageId = activePage.id.replace('page-', '');
+  loadPage(pageId);
+}
+
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('collapsed');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (!sidebar) return;
+
+  if (window.innerWidth <= 900) {
+    const isOpen = sidebar.classList.toggle('open');
+    if (overlay) overlay.classList.toggle('open', isOpen);
+    return;
+  }
+
+  sidebar.classList.toggle('collapsed');
+}
+
+function closeSidebar() {
+  if (window.innerWidth > 900) return;
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
 }
 
 // ── SAAT VE GREETING ──────────────────────────────────
@@ -171,7 +283,7 @@ function statusLabel(s) {
   return { waiting:'Bekliyor', inside:'İçeride', left:'Çıktı', cancelled:'İptal' }[s] || s;
 }
 function apptStatusLabel(s) {
-  return { planned:'Planlandı', arrived:'Geldi', completed:'Tamamlandı', cancelled:'İptal' }[s] || s;
+  return { planned:'Planlandı', pending_approval:'Onay Bekliyor', arrived:'Geldi', completed:'Tamamlandı', cancelled:'İptal' }[s] || s;
 }
 function formatTime(dt) {
   return window.vdFormatTime(dt);
@@ -229,9 +341,9 @@ async function bootSecretaryPanel() {
   api.getCompanies({ active_only: 'true' }).then(list => {
     const def = list.find(c => c.is_default) || list[0];
     if (def) document.getElementById('side-logo-title').textContent = def.name;
-  }).catch(() => {});
+  }).catch(e => console.warn('Firma logosu yüklenemedi:', e.message));
 
-  await loadPage('dashboard');
+  navigate(readPersistedSecretaryPage());
 
   // Status filter listener
   const sf = document.getElementById('status-filter');

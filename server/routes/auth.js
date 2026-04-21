@@ -1,81 +1,171 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { db } = require('../database');
+const prisma = require('../prisma');
 const authMiddleware = require('../middleware/auth');
 const { normalizeManagerUserRecord } = require('../services/auth-service');
 const router = express.Router();
 
-// POST /api/auth/login
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Kullanıcı adı ve şifre gerekli' });
+// ── Brute Force Koruması ─────────────────────────────────
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCK_MS = 15 * 60 * 1000; // 15 dakika
+const loginAttempts = new Map(); // username -> { count, lockedUntil }
 
-  const user = db.prepare('SELECT * FROM users WHERE username=? AND is_active=1').get(username);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-    return res.status(401).json({ error: 'Kullanıcı adı veya şifre hatalı' });
+function checkLoginBlock(username) {
+  const entry = loginAttempts.get(username);
+  if (!entry) return false;
+  if (entry.lockedUntil && Date.now() < entry.lockedUntil) return true;
+  if (entry.lockedUntil && Date.now() >= entry.lockedUntil) { loginAttempts.delete(username); return false; }
+  return false;
+}
+
+function recordFailedLogin(username) {
+  const entry = loginAttempts.get(username) || { count: 0, lockedUntil: null };
+  entry.count++;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + LOGIN_LOCK_MS;
   }
+  loginAttempts.set(username, entry);
+  return entry;
+}
 
-  normalizeManagerUserRecord(db, user);
+function clearLoginAttempts(username) {
+  loginAttempts.delete(username);
+}
 
-  const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '24h' });
+// POST /api/auth/login
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Kullanıcı adı ve şifre gerekli' });
 
-  // Aktivite logu
-  db.prepare(`INSERT INTO activity_logs (user_id, action, entity_type, details) VALUES (?,?,?,?)`).run(
-    user.id, 'login', 'user', `${user.full_name} giriş yaptı`
-  );
+    // Brute force kontrolü
+    if (checkLoginBlock(username)) {
+      const entry = loginAttempts.get(username);
+      const remainMin = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({ error: `Çok fazla başarısız deneme. ${remainMin} dakika sonra tekrar deneyin.` });
+    }
 
-  res.json({
-    token,
-    user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, department: user.department }
-  });
+    const user = await prisma.user.findFirst({
+      where: { username, isActive: true },
+    });
+
+    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+      const entry = recordFailedLogin(username);
+      const remaining = LOGIN_MAX_ATTEMPTS - entry.count;
+      if (entry.lockedUntil) {
+        return res.status(429).json({ error: 'Çok fazla başarısız deneme. 15 dakika sonra tekrar deneyin.' });
+      }
+      return res.status(401).json({ error: `Kullanıcı adı veya şifre hatalı (${remaining} deneme hakkı kaldı)` });
+    }
+
+    clearLoginAttempts(username);
+
+    await normalizeManagerUserRecord(prisma, user);
+
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '24h' });
+
+    // Aktivite logu
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'login',
+        entityType: 'user',
+        details: `${user.fullName} giriş yaptı`,
+      },
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        full_name: user.fullName,
+        role: user.role,
+        department: user.department,
+      },
+    });
+  } catch (e) {
+    console.error('Login hatası:', e.message);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
 });
 
 // GET /api/auth/me
-router.get('/me', authMiddleware, (req, res) => {
-  normalizeManagerUserRecord(db, req.user);
-  res.json({ user: req.user });
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    await normalizeManagerUserRecord(prisma, req.user);
+    res.json({ user: req.user });
+  } catch (e) {
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
 });
 
 // POST /api/auth/logout
-router.post('/logout', authMiddleware, (req, res) => {
-  db.prepare(`INSERT INTO activity_logs (user_id, action, entity_type, details) VALUES (?,?,?,?)`).run(
-    req.user.id, 'logout', 'user', `${req.user.full_name} çıkış yaptı`
-  );
-  res.json({ success: true });
+router.post('/logout', authMiddleware, async (req, res) => {
+  try {
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'logout',
+        entityType: 'user',
+        details: `${req.user.full_name} çıkış yaptı`,
+      },
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
 });
 
 // POST /api/auth/change-password
-router.post('/change-password', authMiddleware, (req, res) => {
-  const { current_password, new_password } = req.body;
+router.post('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
 
-  if (!current_password || !new_password) {
-    return res.status(400).json({ error: 'Mevcut şifre ve yeni şifre gerekli' });
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Mevcut şifre ve yeni şifre gerekli' });
+    }
+    if (typeof new_password !== 'string' || new_password.length < 8) {
+      return res.status(400).json({ error: 'Yeni şifre en az 8 karakter olmalıdır' });
+    }
+    if (current_password === new_password) {
+      return res.status(400).json({ error: 'Yeni şifre mevcut şifre ile aynı olamaz' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: req.user.id, isActive: true },
+      select: { id: true, fullName: true, passwordHash: true },
+    });
+    if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+
+    if (!bcrypt.compareSync(current_password, user.passwordHash)) {
+      return res.status(400).json({ error: 'Mevcut şifre hatalı' });
+    }
+
+    const newHash = bcrypt.hashSync(new_password, 10);
+
+    // Plan §4.7: user update + activity log atomik
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newHash },
+      }),
+      prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'password_change',
+          entityType: 'user',
+          details: `${user.fullName} şifresini değiştirdi`,
+        },
+      }),
+    ]);
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Şifre değiştirme hatası:', e.message);
+    res.status(500).json({ error: 'Sunucu hatası' });
   }
-
-  if (typeof new_password !== 'string' || new_password.length < 8) {
-    return res.status(400).json({ error: 'Yeni şifre en az 8 karakter olmalıdır' });
-  }
-
-  if (current_password === new_password) {
-    return res.status(400).json({ error: 'Yeni şifre mevcut şifre ile aynı olamaz' });
-  }
-
-  const user = db.prepare('SELECT id, full_name, password_hash FROM users WHERE id=? AND is_active=1').get(req.user.id);
-  if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
-
-  if (!bcrypt.compareSync(current_password, user.password_hash)) {
-    return res.status(400).json({ error: 'Mevcut şifre hatalı' });
-  }
-
-  const newHash = bcrypt.hashSync(new_password, 10);
-  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(newHash, user.id);
-
-  db.prepare(`INSERT INTO activity_logs (user_id, action, entity_type, details) VALUES (?,?,?,?)`).run(
-    req.user.id, 'password_change', 'user', `${user.full_name} şifresini değiştirdi`
-  );
-
-  res.json({ success: true });
 });
 
 module.exports = router;

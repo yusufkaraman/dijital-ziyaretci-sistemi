@@ -3,12 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0060f0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>Dijital Ziyaretçi Karşılama Sistemi | Sekretarya Paneli</title>
   <meta name="description" content="Kurumsal dijital ziyaretçi karşılama ve ekran yönetim sistemi" />
-  <link rel="icon" type="image/png" href="/favicon.ico" />
-  <link rel="apple-touch-icon" href="/favicon.ico" />
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="icon" type="image/png" href="/Assets/sitelogo.png" />
+  <link rel="apple-touch-icon" href="/Assets/sitelogo.png" />
   <link rel="stylesheet" href="/fonts/noto-sans.css" />
   <link rel="stylesheet" href="style.css" />
+  <style>html.vd-restoring-scroll body{visibility:hidden}</style>
+  <script>
+    (function() {
+      try {
+        var key = 'vd_state:scroll:' + (window.location.pathname || '/');
+        if (sessionStorage.getItem(key)) {
+          document.documentElement.classList.add('vd-restoring-scroll');
+        }
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -37,7 +52,6 @@
     <a class="nav-item" data-page="checkin" onclick="navigate('checkin')">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
       <span>Hızlı Check-in</span>
-      <span class="badge badge-green">YENİ</span>
     </a>
     <a class="nav-item" data-page="appointments" onclick="navigate('appointments')">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -60,9 +74,8 @@
     <a class="nav-item" data-page="blacklist" onclick="navigate('blacklist')">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
       <span>Kara Liste</span>
-      <span class="badge badge-red">!</span>
     </a>
-    <div class="nav-group-label" style="margin-top:20px;opacity:0.5;font-size:10px">SİSTEM</div>
+    <div class="nav-group-label admin-only" style="margin-top:20px;opacity:0.5;font-size:10px;display:none;">SİSTEM</div>
     <a class="nav-item admin-only" data-page="settings" onclick="navigate('settings')" id="nav-settings" style="display:none">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>Ayarlar</span>
@@ -78,6 +91,7 @@
     <div class="user-status"></div>
   </div>
 </aside>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <!-- MAIN -->
 <main class="main-content">
@@ -90,6 +104,10 @@
       <div class="live-clock" id="live-clock"></div>
     </div>
     <div class="topbar-right">
+      <button id="pwa-install-btn" class="btn-pwa-install" onclick="vdInstallPwa()" style="display:none" title="Mobil Uygulama İndir">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Uygulamayı İndir</span>
+      </button>
       <button class="btn-text" onclick="showChangePasswordModal()" style="font-size:13px;padding:6px 12px;color:var(--text-3);border:1px solid var(--border);border-radius:8px;">🔒 Şifre Değiştir</button>
       <div class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -159,13 +177,6 @@
         </div>
       </div>
 
-      <div class="dash-card full-width">
-        <div class="card-header">
-          <span class="card-title">Haftalık Ziyaretçi Trafiği</span>
-          <div class="chart-legend"><span class="legend-dot blue"></span><span>Giriş</span><span class="legend-dot cyan"></span><span>Çıkış</span></div>
-        </div>
-        <div class="chart-container"><canvas id="trafficChart"></canvas></div>
-      </div>
     </section>
 
     <!-- VISITORS -->
@@ -203,7 +214,7 @@
       <div class="table-card">
         <table class="data-table"><thead><tr>
           <th>Ziyaretçi</th><th>TC / Kimlik</th><th>Ziyaret Sebebi</th>
-          <th>Görüşülen Personel</th><th>Giriş</th><th>Bekleme / Kalış</th>
+          <th>Görüşülen Personel</th><th>Giriş / Çıkış</th><th>Bekleme / Kalış</th>
           <th>Durum</th><th>İşlem</th>
         </tr></thead>
         <tbody id="visitors-tbody"></tbody></table>
@@ -218,7 +229,7 @@
       </div>
       <div class="checkin-layout">
         <div class="checkin-form-card">
-          <div class="form-section-title"><div class="form-step">1</div><span>Kişisel Bilgiler</span></div>
+          <div class="form-section-title"><div class="form-step">1</div><span>Misafir Bilgileri</span></div>
           <div class="form-row">
             <div class="form-group"><label>Ad Soyad *</label><input type="text" id="ci-name" placeholder="Ahmet Yılmaz" class="form-input" /></div>
             <div class="form-group"><label>TC Kimlik No</label><input type="text" id="ci-tc" placeholder="12345678901" maxlength="11" class="form-input" oninput="checkBlacklist(this.value)" /></div>
@@ -227,13 +238,16 @@
             <div class="form-group"><label>Telefon</label><input type="text" id="ci-phone" placeholder="0555 123 45 67" class="form-input" /></div>
             <div class="form-group"><label>E-Posta</label><input type="email" id="ci-email" placeholder="ornek@mail.com" class="form-input" /></div>
           </div>
+          <div class="form-row">
+            <div class="form-group"><label>Çalıştığı Şirket / Kurum</label><input type="text" id="ci-visitor-company" placeholder="ABC Şirketi" class="form-input" /></div>
+          </div>
 
-          <div class="form-section-title" style="margin-top:24px;"><div class="form-step">2</div><span>Ziyaret Bilgileri</span></div>
+          <div class="form-section-title" style="margin-top:24px;"><div class="form-step">2</div><span>Ziyaret Edilecek Personel</span></div>
           <div class="form-row">
             <div class="form-group"><label>Ziyaret Edilen Şirket *</label>
               <select id="ci-company" class="form-input"><option value="">Seçiniz...</option></select>
             </div>
-            <div class="form-group"><label>Görüşülecek Personel *</label>
+            <div class="form-group"><label>Görüşülecek Personel * <span style="font-weight:400;color:var(--text-3);font-size:11px">(Lütfen Sadece Ad Soyad)</span></label>
               <input type="text" id="ci-host-text" class="form-input" list="ci-host-suggestions" placeholder="İsim yazın, sistem öneri sunsun" />
               <datalist id="ci-host-suggestions"></datalist>
               <input type="hidden" id="ci-host-id" />
@@ -259,12 +273,7 @@
             <div class="form-group"><label>Notlar</label><textarea id="ci-notes" placeholder="Ek notlar..." class="form-input" rows="3"></textarea></div>
           </div>
 
-          <div class="form-section-title" style="margin-top:24px;"><div class="form-step">3</div><span>Bildirim Gönder</span></div>
-          <div style="display:flex;gap:16px;margin-bottom:16px">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="ci-email-notif" checked /> 📧 E-posta Bildirimi Gönder (Outlook)
-            </label>
-          </div>
+          <input type="hidden" id="ci-email-notif" value="" />
 
           <div class="form-actions">
             <button class="btn-secondary" onclick="clearCheckinForm()">Temizle</button>
@@ -279,7 +288,7 @@
           <div class="checkin-preview-card">
             <div class="preview-avatar" id="preview-avatar">?</div>
             <div class="preview-name" id="preview-name">Ad Soyad</div>
-            <div class="preview-company" id="preview-company">Ziyaretçi Şirketi</div>
+            <div class="preview-company" id="preview-company">Çalıştığı Şirket</div>
             <div class="badge-inline" id="preview-status">Giriş Bekleniyor</div>
           </div>
           <div class="checkin-recent">
@@ -299,6 +308,19 @@
           Yeni Randevu
         </button>
       </div>
+      <div class="filter-bar" style="margin-bottom:14px">
+        <select id="appointment-date-filter" class="filter-select" onchange="changeAppointmentDateFilter(this.value)">
+          <option value="future">&#350;imdi ve Sonras&#305;</option>
+          <option value="this_week">Bu Hafta</option>
+          <option value="prev_week">Ge&#231;en Hafta</option>
+          <option value="this_month">Bu Ay</option>
+          <option value="prev_month">Ge&#231;en Ay</option>
+          <option value="this_year">Bu Y&#305;l</option>
+          <option value="prev_year">Ge&#231;en Y&#305;l</option>
+          <option value="all">T&#252;m Randevular</option>
+        </select>
+      </div>
+      <div id="pending-approvals-section" style="margin-bottom:20px"></div>
       <div id="appointments-company-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
       <div class="appointments-grid" id="appointments-grid"></div>
     </section>
@@ -325,6 +347,23 @@
         </button>
       </div>
       <div class="screens-grid" id="screens-grid"></div>
+
+      <!-- TICKER (Kayan Yazı) Yönetimi -->
+      <div class="dash-card" style="margin-top:24px; max-width:900px">
+        <div class="card-header">
+          <span class="card-title">Lobi Alt Bar Kayan Yazılar</span>
+          <button class="btn-primary btn-sm" onclick="addTickerRow()">+ Yeni Satır</button>
+        </div>
+        <div style="padding:16px">
+          <p style="font-size:12px; color:var(--text-3); margin-bottom:12px">
+            Her satır lobi ekranının alt bandında sırayla kayar. Sıralamayı sürükleyerek veya ok tuşlarıyla değiştirebilirsiniz.
+          </p>
+          <div id="ticker-rows-container" style="display:flex; flex-direction:column; gap:8px"></div>
+          <div class="form-actions" style="margin-top:16px; padding:0">
+            <button class="btn-primary" onclick="saveTickerMessages()">Kayan Yazıları Kaydet</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- HOSTS -->
@@ -433,12 +472,15 @@
         <div class="dash-card full-width">
           <div class="card-header">
             <span class="card-title">Lobi Ekran İçerikleri (Video/Resim)</span>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="media-upload-company" class="form-input" style="width:160px;padding:6px 10px;font-size:12px">
+                <option value="">Genel (Tum Sirketler)</option>
+              </select>
               <input type="file" id="media-upload-input" style="display:none" onchange="uploadMediaFile(this)" accept="image/*,video/*" />
-              <button class="btn-primary btn-sm" onclick="document.getElementById('media-upload-input').click()">+ Medya Yükle</button>
+              <button class="btn-primary btn-sm" onclick="document.getElementById('media-upload-input').click()">+ Medya Yukle</button>
             </div>
           </div>
-          <div id="screens-content-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:16px;padding:10px"></div>
+          <div id="screens-content-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:16px;padding:10px"></div>
         </div>
       </div>
 
@@ -505,7 +547,7 @@
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
-  <div class="modal" id="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-content" id="modal-box" onclick="event.stopPropagation()">
     <div class="modal-header"><span id="modal-title">Modal</span><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-body" id="modal-body"></div>
   </div>
@@ -535,15 +577,7 @@
 <script src="/js/core/formatters.js"></script>
 <script src="/js/core/charts.js"></script>
 <script src="/js/core/password.js"></script>
-<script src="/js/core/auth.js"></script>
-<script src="/js/core/permissions.js"></script>
-<script src="/js/core/ui.js"></script>
-<script src="/js/core/socket.js"></script>
-<script src="/js/core/notifications.js"></script>
-<script src="/js/core/branding.js"></script>
-<script src="/js/core/formatters.js"></script>
-<script src="/js/core/charts.js"></script>
-<script src="/js/core/password.js"></script>
+<script src="/js/core/pwa-install.js"></script>
 <script src="/app.js?v=20260325-appoint-fix2"></script>
 </body>
 </html>

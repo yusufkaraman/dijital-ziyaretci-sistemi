@@ -3,12 +3,26 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#0060f0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="icon" type="image/png" href="/Assets/sitelogo.png"/>
+  <link rel="apple-touch-icon" href="/Assets/sitelogo.png"/>
   <link rel="stylesheet" href="/fonts/noto-sans.css"/>
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/personel.css" />
-  
-  
-  
+  <style>html.vd-restoring-scroll body{visibility:hidden}</style>
+  <script>
+    (function() {
+      try {
+        var key = 'vd_state:scroll:' + (window.location.pathname || '/');
+        if (sessionStorage.getItem(key)) {
+          document.documentElement.classList.add('vd-restoring-scroll');
+        }
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -24,15 +38,19 @@
     </div>
   </div>
   </div>
-  <div class="topbar-right">
-    <button class="btn-primary" onclick="openAddVisitorModal()">+ Yeni Giriş Kaydı veya Randevu Oluştur</button>
-    <button class="btn-secondary" style="height:36px; padding:0 16px; font-size:13px;" onclick="showChangePasswordModal()">Şifre Değiştir</button>
+  <div class="topbar-right topbar-right-mobile-grid">
+    <button class="btn-primary topbar-mobile-primary" onclick="openAddVisitorModal()">+ Yeni Giriş Kaydı veya Randevu Oluştur</button>
+    <button id="pwa-install-btn" class="btn-pwa-install topbar-mobile-install" onclick="vdInstallPwa()" style="display:none" title="Mobil Uygulama İndir">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>Uygulamayı İndir</span>
+    </button>
+    <button class="btn-secondary topbar-mobile-password" style="height:36px; padding:0 16px; font-size:13px;" onclick="showChangePasswordModal()">Şifre Değiştir</button>
     <div class="live-indicator"><div class="live-dot"></div><span>Canlı</span></div>
     <div class="top-clock" id="top-clock"></div>
-    <button class="btn-icon" onclick="toggleNotifications()" title="Bildirimler" style="width:36px; height:36px;">
+    <button class="btn-icon topbar-mobile-notifications" onclick="toggleNotifications()" title="Bildirimler" style="width:36px; height:36px;">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> <span id="notif-count" style="background:var(--red);color:#fff;padding:1px 6px;border-radius: var(--radius);font-size:10px;display:none">0</span>
     </button>
-    <div class="user-chip" onclick="logout()">
+    <div class="user-chip topbar-mobile-user" onclick="logout()">
       <div class="av" id="user-av">?</div>
       <div>
         <div style="font-size:13px;font-weight:600" id="user-name">Yükleniyor</div>
@@ -57,18 +75,18 @@
   <div class="alert-banner" id="arrival-banner">
     <div class="alert-icon">🔔</div>
     <div>
-      <div style="font-weight:700;font-size:16px" id="banner-title">Yeni Misafir Girişi</div>
-      <div style="color:var(--muted);font-size:13px" id="banner-sub">Sizi bekliyor</div>
+      <div style="font-weight:700;font-size:16px" id="banner-title">Yeni Misafir Bildirimi</div>
+      <div style="color:var(--muted);font-size:13px" id="banner-sub">Misafir geldi</div>
     </div>
     <div class="alert-btn">
-      <button class="btn-link" onclick="closeBanner()">Kapat</button>
+      <button onclick="closeBanner()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;padding:0 8px">×</button>
     </div>
   </div>
 
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-icon">⏳</div>
-      <div class="kpi-info"><span class="kpi-label">Onay Bekleyen misafirlerim</span><span class="kpi-value"  id="kpi-waiting">—</span></div>
+      <div class="kpi-info"><span class="kpi-label">Fast Check-In Gelenlerim</span><span class="kpi-value"  id="kpi-waiting">—</span></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon">✅</div>
@@ -90,8 +108,17 @@
     </div>
     
     <div class="card">
-      <div class="card-header"><span class="card-title">📅 Randevu Takvimim</span></div>
-      <div id="appts-list"><div class="empty">Yükleniyor...</div></div>
+      <div class="card-header">
+        <span class="card-title">📅 Randevu Takvimim</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn-secondary btn-sm" onclick="resetApptFilter()">Bugüne Dön</button>
+        </div>
+      </div>
+      <div id="day-detail-panel" class="calendar-day-detail" style="display:none;">
+        <div id="day-detail-header" style="font-weight:800;font-size:15px;color:var(--primary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed var(--border)"></div>
+        <div id="day-detail-list"></div>
+      </div>
+      <div id="calendar-container" class="calendar-card-body"></div>
     </div>
   </div>
 
@@ -136,7 +163,7 @@
       <input type="hidden" id="modal-mode" value="guest">
       
       <div id="info-box" style="margin-bottom:15px; background:rgba(217, 119, 6, 0.1); padding:10px; border-radius: var(--radius); border:1px solid rgba(217, 119, 6, 0.2); font-size:12px; color:#b45309;">
-        <strong>Not:</strong> Eklediğiniz misafirler sekreter onayına düşecek ve onay sonrasında içeri alınacaktır.
+        <strong>Not:</strong> Fast check-in kaydı oluşturduğunuz anda misafir doğrudan geldi olarak işlenir ve hosta bildirim gider.
       </div>
 
       <!-- 1. Kişisel Bilgiler -->
@@ -163,7 +190,7 @@
             <input type="email" id="add-email" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="ornek@mail.com">
           </div>
           <div style="grid-column: span 2">
-            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Firma / Kurum</label>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Misafirin Çalıştığı Şirket / Kurum</label>
             <input type="text" id="add-company" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="ABC Şirketi">
           </div>
         </div>
@@ -183,8 +210,18 @@
             </select>
           </div>
           <div>
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Ziyaret Edilen Şirket *</label>
+            <select id="add-visited-company-id" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)">
+              <option value="">Seçiniz...</option>
+            </select>
+          </div>
+          <div>
             <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Ziyaret Sebebi *</label>
-            <input type="text" id="add-reason" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)" placeholder="Toplantı, İş Görüşmesi vb.">
+            <select id="add-reason" style="width:100%;padding:10px;border:1px solid var(--border);border-radius: var(--radius)">
+              <option value="">Seçiniz...</option>
+              <option>İş Görüşmesi</option><option>Toplantı</option><option>Teslimat</option>
+              <option>Teknik Destek</option><option>Danışma</option><option>Denetim</option><option>Diğer</option>
+            </select>
           </div>
           <div>
             <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Araç Plakası</label>
@@ -213,7 +250,7 @@
 
       <div style="text-align:right;margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
         <button class="btn-link" onclick="closeAddVisitorModal()">İptal</button>
-        <button class="btn-primary" id="btn-submit" style="padding: 10px 24px" onclick="submitAddVisitor()">Giriş Talebini Gönder</button>
+        <button class="btn-primary" id="btn-submit" style="padding: 10px 24px" onclick="submitAddVisitor()">Fast Check-In Oluştur</button>
       </div>
     </div>
   </div>
@@ -237,9 +274,9 @@
 <script src="/js/core/ui.js"></script>
 <script src="/js/core/socket.js"></script>
 <script src="/js/core/notifications.js"></script>
+<script src="/js/core/pwa-install.js"></script>
 <script src="/js/core/branding.js"></script>
 <script src="/js/core/formatters.js"></script>
-<script src="/js/core/charts.js"></script>
 <script src="/js/core/password.js"></script>
 <script src="/js/panels/personnel-panel.js"></script>
 </body>

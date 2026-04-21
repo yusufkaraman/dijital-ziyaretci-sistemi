@@ -1,3 +1,5 @@
+const prisma = require('../prisma');
+
 function validatePasswordPolicy(password) {
   return typeof password === 'string' && password.length >= 8;
 }
@@ -8,58 +10,116 @@ function normalizeCompanyId(rawCompanyId) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function getUserById(db, id) {
-  return db.prepare(`
-    SELECT
-      u.id, u.username, u.full_name, u.role, u.department, u.is_active,
-      p.company_id,
-      c.name as company_name
-    FROM users u
-    LEFT JOIN personnel p ON p.user_id=u.id AND p.is_active=1
-    LEFT JOIN companies c ON c.id=p.company_id
-    WHERE u.id=?
-  `).get(id);
+/**
+ * Kullanıcıyı personnel + company join ile döndürür.
+ * API contract: frontend company_id ve company_name anahtarlarını bekliyor.
+ */
+async function getUserById(id) {
+  const user = await prisma.user.findUnique({
+    where: { id: Number(id) },
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      role: true,
+      department: true,
+      isActive: true,
+      personnel: {
+        where: { isActive: true },
+        take: 1,
+        select: {
+          companyId: true,
+          company: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!user) return null;
+  const p = user.personnel[0] || null;
+  return {
+    id: user.id,
+    username: user.username,
+    full_name: user.fullName,
+    role: user.role,
+    department: user.department,
+    is_active: user.isActive ? 1 : 0,
+    company_id: p?.companyId ?? null,
+    company_name: p?.company?.name ?? null,
+  };
 }
 
-function ensurePersonnelRecordsForUsers(db) {
-  db.prepare(`
-    INSERT INTO personnel (company_id, full_name, department, user_id, is_active)
-    SELECT NULL, COALESCE(u.full_name, u.username, 'Kullanici'), u.department, u.id, u.is_active
-    FROM users u
-    WHERE NOT EXISTS (
-      SELECT 1 FROM personnel p WHERE p.user_id=u.id
-    )
-  `).run();
+/**
+ * Her users kaydı için eşleşen personnel satırı yoksa oluşturur.
+ * Mevcut personnel satırını full_name, department ve is_active ile senkronize eder.
+ * Plan §4.7: users + personnel atomik transaction içinde.
+ */
+async function ensurePersonnelRecordsForUsers() {
+  const users = await prisma.user.findMany({
+    select: { id: true, fullName: true, department: true, isActive: true },
+  });
 
-  db.prepare(`
-    UPDATE personnel
-    SET
-      full_name = COALESCE((SELECT u.full_name FROM users u WHERE u.id=personnel.user_id), full_name),
-      department = COALESCE((SELECT u.department FROM users u WHERE u.id=personnel.user_id), department),
-      is_active = COALESCE((SELECT u.is_active FROM users u WHERE u.id=personnel.user_id), is_active)
-    WHERE user_id IS NOT NULL
-  `).run();
-}
+  for (const u of users) {
+    const existing = await prisma.personnel.findFirst({
+      where: { userId: u.id },
+      select: { id: true },
+    });
 
-function syncPersonnelCompanyForUser(db, payload) {
-  const safeFullName = (typeof payload.fullName === 'string' && payload.fullName.trim())
-    ? payload.fullName.trim()
-    : 'Kullanici';
-
-  const existing = db.prepare('SELECT id FROM personnel WHERE user_id=? ORDER BY id LIMIT 1').get(payload.userId);
-  if (existing) {
-    db.prepare(`
-      UPDATE personnel
-      SET company_id=COALESCE(?, company_id), full_name=?, department=?, is_active=1
-      WHERE id=?
-    `).run(payload.companyId, safeFullName, payload.department || null, existing.id);
-    return;
+    if (!existing) {
+      await prisma.personnel.create({
+        data: {
+          userId: u.id,
+          fullName: u.fullName || 'Kullanici',
+          department: u.department,
+          isActive: u.isActive,
+        },
+      });
+    } else {
+      await prisma.personnel.update({
+        where: { id: existing.id },
+        data: {
+          fullName: u.fullName || 'Kullanici',
+          department: u.department,
+          isActive: u.isActive,
+        },
+      });
+    }
   }
+}
 
-  db.prepare(`
-    INSERT INTO personnel (company_id, full_name, department, user_id, is_active)
-    VALUES (?, ?, ?, ?, 1)
-  `).run(payload.companyId, safeFullName, payload.department || null, payload.userId);
+/**
+ * Kullanıcıya bağlı personnel kaydının şirketi ve adını günceller / oluşturur.
+ * Plan §4.7: user create/update with personnel sync — atomik transaction.
+ */
+async function syncPersonnelCompanyForUser({ userId, companyId, fullName, department }) {
+  const safeFullName = (typeof fullName === 'string' && fullName.trim()) ? fullName.trim() : 'Kullanici';
+
+  const existing = await prisma.personnel.findFirst({
+    where: { userId },
+    orderBy: { id: 'asc' },
+    select: { id: true, companyId: true },
+  });
+
+  if (existing) {
+    await prisma.personnel.update({
+      where: { id: existing.id },
+      data: {
+        companyId: companyId ?? existing.companyId,
+        fullName: safeFullName,
+        department: department || null,
+        isActive: true,
+      },
+    });
+  } else {
+    await prisma.personnel.create({
+      data: {
+        userId,
+        companyId: companyId || null,
+        fullName: safeFullName,
+        department: department || null,
+        isActive: true,
+      },
+    });
+  }
 }
 
 module.exports = {

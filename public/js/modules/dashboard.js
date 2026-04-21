@@ -19,14 +19,15 @@
   const recent = visitors.slice(0, 5);
   rvl.innerHTML = recent.length ? recent.map(v => `
     <div class="visitor-row" style="cursor:pointer">
-      <div class="visitor-avatar">${v.full_name[0]}</div>
+      <div class="visitor-avatar">${esc(v.full_name)[0]}</div>
       <div class="visitor-info" onclick="showVisitorDetail(${v.id})">
-        <div class="visitor-name">${v.full_name}</div>
-        <div class="visitor-meta">${v.company_name||'—'} → ${v.host_name||'—'} ${v.host_company_name ? '('+v.host_company_name+')' : ''}</div>
+        <div class="visitor-name">${esc(v.full_name)}</div>
+        <div class="visitor-meta">${esc(v.company_name)||'—'} → ${esc(v.host_name)||'—'} ${v.host_company_name ? '('+esc(v.host_company_name)+')' : ''}</div>
+        <div class="visitor-meta">${visitorTimeSummary(v)}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span class="status-badge status-${v.status}">${statusLabel(v.status)}</span>
-        ${v.status==='inside' ? `<button class="btn-secondary" style="font-size:10px;padding:4px 8px" onclick="checkoutAction(${v.id})">Çıkış</button>` : ''}
+      <div class="recent-visitor-actions">
+        <span class="status-badge recent-visitor-status status-${v.status}">${statusLabel(v.status)}</span>
+        ${v.status==='inside' ? `<button class="btn-secondary recent-visitor-btn" onclick="withButtonLock(this, function(){ return checkoutAction(${v.id}) })">Çıkış</button>` : ''}
       </div>
     </div>`).join('') : '<div class="empty-state">Bugün henüz giriş yapılmadı.</div>';
 
@@ -34,12 +35,11 @@
   const ual = document.getElementById('upcoming-appointments-list');
   const todayAppts = appointments.slice(0, 5);
   ual.innerHTML = todayAppts.length ? todayAppts.map(a => `
-    <div class="visitor-row">
-      <div class="visitor-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">${a.visitor_name[0]}</div>
-        <div class="visitor-info"><div class="visitor-name">${a.visitor_name}</div><div class="visitor-meta">🏢 ${a.visitor_company||'—'} · 🕒 ${formatTime(a.planned_time)} · ${a.host_name||'—'}</div></div>
-      <div style="display:flex;gap:4px">
-        <button class="btn-primary" style="font-size:10px;padding:4px 8px;background:var(--green);border:none" onclick='checkInAppointment(${JSON.stringify(a).replace(/'/g, "\\'")})'>Giriş Yaptır</button>
-        <button class="btn-calendar" style="padding:4px 8px" onclick='openGoogleCalendar(${JSON.stringify(a).replace(/'/g, "\\'")})'>📅</button>
+    <div class="visitor-row appointment-row">
+      <div class="visitor-avatar appointment-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">${esc(a.visitor_name)[0]}</div>
+        <div class="visitor-info" style="cursor:pointer" onclick="showAppointmentDetail(${a.id})"><div class="visitor-name">${esc(a.visitor_name)}</div><div class="visitor-meta">🏢 ${esc(a.visitor_company)||'—'} · 🕒 ${formatTime(a.planned_time)} · ${esc(a.host_name)||'—'}</div></div>
+      <div class="appointment-row-actions">
+        <button class="btn-primary appointment-checkin-btn" onclick='checkInAppointment(${JSON.stringify(a).replace(/'/g, "\\'")})'>Geldi Haber Ver</button>
       </div>
     </div>`).join('') : '<div class="empty-state">Bugün randevu yok</div>';
 
@@ -51,15 +51,16 @@
   if(pl) {
     pl.innerHTML = pending.length ? pending.map(v => `
       <div class="visitor-row" style="border-left:4px solid var(--orange)">
-        <div class="visitor-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">${v.full_name[0]}</div>
-        <div class="visitor-info">
-          <div class="visitor-name">${v.full_name}</div>
-          <div class="visitor-meta">Geleceği Kişi: <strong>${v.host_name||'—'}</strong> ${v.host_company_name ? '('+v.host_company_name+')' : ''}</div>
-          <div class="visitor-meta">${v.company_name||'—'} · ${v.reason||'—'}</div>
+        <div class="visitor-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">${esc(v.full_name)[0]}</div>
+        <div class="visitor-info" style="cursor:pointer" onclick="showVisitorDetail(${v.id})">
+          <div class="visitor-name">${esc(v.full_name)}</div>
+          <div class="visitor-meta">Geleceği Kişi: <strong>${esc(v.host_name)||'—'}</strong> ${v.host_company_name ? '('+esc(v.host_company_name)+')' : ''}</div>
+          <div class="visitor-meta">${esc(v.company_name)||'—'} · ${esc(v.reason)||'—'}</div>
+          <div class="visitor-meta">${visitorTimeSummary(v)}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn-primary" style="font-size:11px;padding:6px 12px;background:var(--green);border:1px solid var(--green)" onclick="verifyPersonnelGuest(${v.id})">✅ Onayla</button>
-          <button class="btn-secondary" style="font-size:11px;padding:6px 12px;color:var(--red);border-color:#fecaca" onclick="declinePersonnelGuest(${v.id})">❌ Reddet</button>
+          <button class="btn-primary" style="font-size:11px;padding:6px 12px;background:var(--green);border:1px solid var(--green)" onclick="withButtonLock(this, function(){ return verifyPersonnelGuest(${v.id}) })">✅ Onayla</button>
+          <button class="btn-secondary" style="font-size:11px;padding:6px 12px;color:var(--red);border-color:#fecaca" onclick="withButtonLock(this, function(){ return declinePersonnelGuest(${v.id}) })">❌ Reddet</button>
         </div>
       </div>`).join('') : '<div class="empty-state">Onay bekleyen kayıt yok</div>';
   }
@@ -72,9 +73,9 @@
   if(wl) {
     wl.innerHTML = waiting.length ? waiting.map(v => `
       <div class="visitor-row" style="border-left:4px solid var(--green)">
-        <div class="visitor-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">${v.full_name[0]}</div>
-        <div class="visitor-info"><div class="visitor-name">${v.full_name}</div><div class="visitor-meta">${v.host_name||'—'} · ${v.reason||'—'}</div></div>
-        <button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="arrivedVisitor(${v.id})">Girdi ✓</button>
+        <div class="visitor-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">${esc(v.full_name)[0]}</div>
+        <div class="visitor-info" style="cursor:pointer" onclick="showVisitorDetail(${v.id})"><div class="visitor-name">${esc(v.full_name)}</div><div class="visitor-meta">${esc(v.host_name)||'—'} · ${esc(v.reason)||'—'}</div><div class="visitor-meta">${visitorTimeSummary(v)}</div></div>
+        <button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="withButtonLock(this, function(){ return arrivedVisitor(${v.id}) })">Girdi ✓</button>
       </div>`).join('') : '<div class="empty-state">Giriş yapması beklenen kimse yok</div>';
   }
 

@@ -1,0 +1,23 @@
+
+# Test ortamı için izole PostgreSQL — 5433 portunda çalışır
+# Kullanım: docker compose -f docker-compose.test.yml up -d
+# npm test öncesinde bu container'ın çalışıyor olması gerekir.
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: dijital-ziyaretci-test-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: dijital_ziyaretci_test
+      TZ: Europe/Istanbul
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dijital_ziyaretci_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /var/lib/postgresql/data  # Bellekte çalışır, test sonrası veri silinir
