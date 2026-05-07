@@ -45,7 +45,8 @@ function showToast(msg, type) {
 var _notifs = [];
 function toggleNotifications() {
   const p = document.getElementById('notif-panel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (!p) return;
+  p.classList.toggle('open');
 }
 function addNotif(msg) {
   _notifs.unshift({ msg, time: new Date().toLocaleTimeString('tr-TR') });
@@ -347,6 +348,7 @@ function renderCalendar() {
     html += '<div class="big-cal-day-num">' + d + '</div>';
 
     if (dayAppts.length > 0) {
+      html += '<div class="mobile-cal-badge">' + dayAppts.length + '</div>';
       var densityClass = 'density-comfy';
       var maxShow = 3;
       if (dayAppts.length >= 6) { densityClass = 'density-packed'; maxShow = 5; }
@@ -410,15 +412,15 @@ function showDayDetail(dateStr) {
     list.innerHTML = '<div class="empty-state">Bu tarihte randevu bulunmuyor.</div>';
   } else {
     list.innerHTML = dayAppts.map(function(a) {
-      return '<div class="visitor-row" id="appt-row-' + a.id + '">' +
+      return '<div class="visitor-row appt-card-row" id="appt-row-' + a.id + '">' +
         renderCalendarBlock(a.planned_time) +
-        '<div class="visitor-info" style="cursor:pointer" onclick="showAppointmentDetail(' + a.id + ')"><div class="visitor-name">' + esc(a.visitor_name) + '</div>' +
+        '<div class="visitor-info" style="cursor:pointer;min-width:0" onclick="showAppointmentDetail(' + a.id + ')"><div class="visitor-name" style="font-size:14px">' + esc(a.visitor_name) + '</div>' +
         '<div class="visitor-meta">🕒 ' + fmt(a.planned_time) + ' · ' + esc(a.reason || '—') + (a.host_name ? ' · 👤 ' + esc(a.host_name) : '') + '</div></div>' +
-        '<div style="display:flex;align-items:center;gap:6px">' +
+        '<div class="appt-actions">' +
         '<span class="status-badge status-' + a.status + '">' + (statMap[a.status] || a.status) + '</span>' +
-        '<button class="btn-calendar" data-appt-id="' + a.id + '">📅 Ekle</button>' +
-        (a.status === 'planned' ? '<button class="btn-primary js-quick-complete-appt" data-appt-id="' + a.id + '" data-appt-name="' + esc(a.visitor_name || '') + '" style="font-size:11px;padding:5px 10px;background:#10b981;border-color:#10b981">Geldi Gitti</button>' : '') +
-        (a.status === 'planned' ? '<button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="withButtonLock(this, function(){ return cancelAppt(' + a.id + ') })">İptal</button>' : '') +
+        '<button class="btn-calendar appt-btn" data-appt-id="' + a.id + '">📅 Ekle</button>' +
+        (a.status === 'planned' ? '<button class="btn-primary appt-btn js-quick-complete-appt" data-appt-id="' + a.id + '" data-appt-name="' + esc(a.visitor_name || '') + '" style="background:#10b981;border-color:#10b981">✓ Geldi Gitti</button>' : '') +
+        (a.status === 'planned' ? '<button class="btn-secondary appt-btn" onclick="withButtonLock(this, function(){ return cancelAppt(' + a.id + ') })">✕ İptal</button>' : '') +
         '</div></div>';
     }).join('');
     list.querySelectorAll('.btn-calendar[data-appt-id]').forEach(function(btn) {
@@ -492,7 +494,7 @@ function loadTodayAll() {
         '<div class="vitem-meta">' + esc(v.reason || '—') + ' · ' + visitorTimeSummary(v, fmt) + '</div></div>' +
         '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">' +
           '<span class="badge badge-' + esc(v.status) + '">' + esc(statMap[v.status] || v.status) + '</span>' +
-          (v.status === 'inside' ? '<button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="event.stopPropagation(); withButtonLock(this, () => checkoutVisitorByPersonnel(' + v.id + '))">Çıkış</button>' : '') +
+          (v.status === 'inside' ? '<button class="btn-checkout-red" onclick="event.stopPropagation(); withButtonLock(this, () => checkoutVisitorByPersonnel(' + v.id + '))">Çıkış</button>' : '') +
         '</div>' +
         '</div>';
     }).join('');
@@ -570,8 +572,10 @@ async function showAppointmentDetail(id) {
     '<div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Durum</div><span class="status-badge status-' + a.status + '">' + apptStatusLabel(a.status) + '</span></div>' +
     '</div>' +
     (a.notes ? '<div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Notlar</div><div>' + esc(a.notes) + '</div></div>' : '') +
-    '<div style="display:flex;gap:10px;margin-top:8px">' +
-    (a.status === 'planned' ? '<button class="btn-primary" style="background:#10b981;border-color:#10b981" onclick="quickCompleteAppointment(window._lastApptDetail.id, window._lastApptDetail.visitor_name);closeModal()">Geldi Gitti</button> <button class="btn-secondary" onclick="cancelAppt(' + a.id + ');closeModal()">İptal Et</button> <button class="btn-calendar" onclick="openGoogleCalendar(window._lastApptDetail);closeModal()">📅 Takvime Ekle</button>' : '') +
+    '<div class="modal-action-row">' +
+    (a.status === 'planned' ? '<button class="btn-primary" style="background:#10b981;border-color:#10b981" onclick="quickCompleteAppointment(window._lastApptDetail.id, window._lastApptDetail.visitor_name);closeModal()">Geldi Gitti</button>' : '') +
+    (a.status === 'planned' ? '<button class="btn-secondary" onclick="cancelAppt(' + a.id + ');closeModal()">İptal Et</button>' : '') +
+    (a.status === 'planned' ? '<button class="btn-calendar" onclick="openGoogleCalendar(window._lastApptDetail);closeModal()">📅 Takvime Ekle</button>' : '') +
     '</div></div>');
   window._lastApptDetail = a;
 }

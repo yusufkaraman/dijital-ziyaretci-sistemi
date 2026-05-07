@@ -37,7 +37,7 @@ router.get('/login', authMiddleware, async (req, res) => {
     const response = await pca.getAuthCodeUrl(authCodeUrlParameters);
     res.json({ url: response });
   } catch (error) {
-    console.error('MSAL auth url hatası:', Math.random());
+    console.error('MSAL auth url hatası:', error.message);
     res.status(500).json({ error: 'Oturum açma URLsi oluşturulamadı' });
   }
 });
@@ -55,11 +55,11 @@ router.get('/callback', async (req, res) => {
   try {
     const response = await pca.acquireTokenByCode(tokenRequest);
     // Gerçek sistemde tokens (response.accessToken, response.refreshToken) users tablosunda saklanır.
-    // Şimdilik mock: Outlook bağlantısını department alanına not düş
-    await prisma.user.updateMany({
-      where: { id: Number(userId) },
-      data: { department: { set: undefined } }, // TODO: gerçek token storage
-    }).catch(() => {});
+    // TODO: gercek token storage eklendiginde burada kullaniciya bagli saklanacak.
+    const user = await prisma.user.findUnique({ where: { id: Number(userId) }, select: { id: true } });
+    if (!user || !response.accessToken) {
+      return res.redirect('/yonetici?outlook=error');
+    }
     
     // Yönlendirme
     res.redirect('/yonetici?outlook=success');

@@ -1,4 +1,4 @@
-﻿async function refreshDashboard() {
+async function refreshDashboard() {
   const [stats, visitors, appointments] = await Promise.all([
     api.getVisitorStats(),
     api.getVisitors({ date: 'today' }),
@@ -27,7 +27,7 @@
       </div>
       <div class="recent-visitor-actions">
         <span class="status-badge recent-visitor-status status-${v.status}">${statusLabel(v.status)}</span>
-        ${v.status==='inside' ? `<button class="btn-secondary recent-visitor-btn" onclick="withButtonLock(this, function(){ return checkoutAction(${v.id}) })">Çıkış</button>` : ''}
+        ${v.status==='inside' ? `<button class="btn-checkout-red recent-visitor-btn" onclick="withButtonLock(this, function(){ return checkoutAction(${v.id}) })">Çıkış</button>` : ''}
       </div>
     </div>`).join('') : '<div class="empty-state">Bugün henüz giriş yapılmadı.</div>';
 

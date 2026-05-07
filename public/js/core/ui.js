@@ -30,6 +30,7 @@
     if (generic && genericTitle && genericBody) {
       genericTitle.textContent = title || '';
       genericBody.innerHTML = content || '';
+      generic.classList.add('open');
       generic.style.display = 'flex';
       document.body.classList.add('modal-open');
     }
@@ -40,7 +41,10 @@
     if (legacy) legacy.classList.remove('open');
 
     const generic = document.getElementById('generic-modal-overlay');
-    if (generic) generic.style.display = 'none';
+    if (generic) {
+      generic.classList.remove('open');
+      generic.style.display = 'none';
+    }
 
     document.body.classList.remove('modal-open');
   }

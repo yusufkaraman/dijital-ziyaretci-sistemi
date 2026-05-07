@@ -44,7 +44,6 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span>Uygulamayı İndir</span>
     </button>
-    <button class="btn-secondary topbar-mobile-password" style="height:36px; padding:0 16px; font-size:13px;" onclick="showChangePasswordModal()">Şifre Değiştir</button>
     <div class="live-indicator"><div class="live-dot"></div><span>Canlı</span></div>
     <div class="top-clock" id="top-clock"></div>
     <button class="btn-icon topbar-mobile-notifications" onclick="toggleNotifications()" title="Bildirimler" style="width:36px; height:36px;">
@@ -57,7 +56,10 @@
         <div style="font-size:11px;color:var(--muted)" id="user-company">Şirket bilgisi yükleniyor...</div>
       </div>
     </div>
-    <button class="btn-text logout-visible-btn" onclick="logout()" title="Çıkış Yap">Çıkış Yap</button>
+    <div class="topbar-mobile-actions">
+      <button class="btn-secondary topbar-mobile-password" style="height:36px; padding:0 16px; font-size:13px;" onclick="showChangePasswordModal()">Şifre Değiştir</button>
+      <button class="btn-text logout-visible-btn" onclick="logout()" title="Çıkış Yap">Çıkış Yap</button>
+    </div>
   </div>
 </header>
 
@@ -65,7 +67,10 @@
   <div class="notif-card">
     <div class="notif-header">
       <span>🔔 Bildirimler</span>
-      <button onclick="clearNotifs()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:'Noto Sans','Helvetica Neue',Arial,sans-serif">Temizle</button>
+      <div style="display:flex;gap:12px;align-items:center">
+        <button onclick="clearNotifs()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:'Noto Sans','Helvetica Neue',Arial,sans-serif">Temizle</button>
+        <button onclick="toggleNotifications()" style="background:none;border:none;color:var(--text-1);cursor:pointer;font-size:18px;font-weight:bold;line-height:1">×</button>
+      </div>
     </div>
     <div id="notif-list"><div class="empty">Bildirim yok</div></div>
   </div>
@@ -99,7 +104,7 @@
     </div>
   </div>
 
-  <div class="dash-grid">
+  <div class="dash-grid priority-dash-grid">
     <div class="card">
       <div class="card-header">
         <span class="card-title">📋 Günün Tüm Misafir Kayıtları</span>
@@ -124,7 +129,7 @@
   </div>
 
   <div class="dash-grid">
-    <div class="card full-width" style="grid-column: span 2">
+    <div class="card full-width">
       <div class="card-header">
         <span class="card-title">🏢 Toplantı Odaları ve Rezervasyonlar</span>
         <button class="btn-primary btn-sm" onclick="showRoomReservation()">+ Yeni Rezervasyon</button>
@@ -160,7 +165,7 @@
       <button id="tab-guest" class="btn-link" style="flex:1; border:none; border-radius:0; padding:12px; font-weight:700; color:var(--primary); border-bottom:2px solid var(--primary)" onclick="switchModalTab('guest')">Anlık Misafir Kaydı</button>
       <button id="tab-appt" class="btn-link" style="flex:1; border:none; border-radius:0; padding:12px; font-weight:700; color:var(--muted)" onclick="switchModalTab('appt')">İleri Tarihli Randevu</button>
     </div>
-    <div class="modal-body" style="padding:24px; max-height:85vh; overflow-y:auto">
+    <div class="modal-body" style="padding:24px; overflow-y:auto">
       <input type="hidden" id="modal-mode" value="guest">
       
       <div id="info-box" style="margin-bottom:15px; background:rgba(217, 119, 6, 0.1); padding:10px; border-radius: var(--radius); border:1px solid rgba(217, 119, 6, 0.2); font-size:12px; color:#b45309;">
@@ -249,10 +254,10 @@
         </div>
       </div>
 
-      <div style="text-align:right;margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn-link" onclick="closeAddVisitorModal()">İptal</button>
-        <button class="btn-primary" id="btn-submit" style="padding: 10px 24px" onclick="submitAddVisitor()">Fast Check-In Oluştur</button>
-      </div>
+    </div>
+    <div class="modal-footer" style="padding:16px 24px; border-top:1px solid var(--border); background:#fff; display:flex; justify-content:flex-end; gap:8px;">
+      <button class="btn-link" onclick="closeAddVisitorModal()">İptal</button>
+      <button class="btn-primary" id="btn-submit" style="padding: 10px 24px" onclick="submitAddVisitor()">Fast Check-In Oluştur</button>
     </div>
   </div>
 </div>

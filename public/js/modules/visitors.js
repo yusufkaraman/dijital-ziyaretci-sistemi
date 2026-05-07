@@ -1,4 +1,4 @@
-﻿// ── ZİYARETÇİLER ──────────────────────────────────────
+// ── ZİYARETÇİLER ──────────────────────────────────────
 let allVisitors = [];
 async function loadVisitors() {
   const dateFilter = document.getElementById('date-filter')?.value || 'today';
@@ -24,7 +24,7 @@ function renderVisitorsTable(list) {
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${v.status==='waiting' && v.is_approved===0 ? `<button class="btn-primary" style="font-size:11px;padding:5px 10px;background:var(--green);border:none" onclick="withButtonLock(this, function(){ return verifyPersonnelGuest(${v.id}) })">✅ Onayla</button> <button class="btn-sm danger" onclick="withButtonLock(this, function(){ return declinePersonnelGuest(${v.id}) })">❌</button>` : ''}
           ${v.status==='waiting' && v.is_approved===1 ? `<button class="btn-primary" style="font-size:11px;padding:5px 10px" onclick="withButtonLock(this, function(){ return arrivedVisitor(${v.id}) })">Girdi ✓</button>` : ''}
-          ${v.status==='inside' ? `<button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="withButtonLock(this, function(){ return checkoutAction(${v.id}) })">Çıkış</button>` : ''}
+          ${v.status==='inside' ? `<button class="btn-checkout-red" onclick="withButtonLock(this, function(){ return checkoutAction(${v.id}) })">Çıkış</button>` : ''}
           <button class="btn-icon" onclick="showVisitorDetail(${v.id})" title="Detay">👁</button>
         </div>
       </td>
@@ -81,7 +81,7 @@ async function showVisitorDetail(id) {
       <div style="display:flex;gap:10px;margin-top:8px">
         ${v.status==='waiting' && v.is_approved===0 ? `<button class="btn-primary" style="background:var(--green);border:none" onclick="verifyPersonnelGuest(${v.id});closeModal()">✅ Onayla</button> <button class="btn-secondary" style="color:var(--red);border-color:#fecaca" onclick="declinePersonnelGuest(${v.id});closeModal()">❌ Reddet</button>` : ''}
         ${v.status==='waiting' && v.is_approved===1 ? `<button class="btn-primary" onclick="arrivedVisitor(${v.id});closeModal()">🚪 İçeri Al (Giriş)</button>` : ''}
-        ${v.status==='inside' ? `<button class="btn-secondary" onclick="checkoutAction(${v.id});closeModal()">👋 Çıkış Yaptır</button>` : ''}
+        ${v.status==='inside' ? `<button class="btn-checkout-red" onclick="checkoutAction(${v.id});closeModal()" style="padding:10px 16px; font-size:13px">👋 Çıkış Yaptır</button>` : ''}
       </div>
     </div>`);
 }

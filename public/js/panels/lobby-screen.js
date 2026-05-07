@@ -332,26 +332,7 @@ function getCompanyTaggedMediaItems(companyId) {
     .filter((item) => Number(item.company_id) === Number(companyId));
 }
 
-function normalizeCompanyKey(value) {
-  return String(value || '')
-    .trim()
-    .toLocaleLowerCase('tr-TR')
-    .replace(/\s+/g, ' ');
-}
-
-function findCachedCompanyIdByName(name) {
-  const key = normalizeCompanyKey(name);
-  if (!key) return null;
-  const item = cachedMediaItems.find((media) => normalizeCompanyKey(media.company_name) === key);
-  const companyId = item && Number(item.company_id);
-  return Number.isFinite(companyId) ? companyId : null;
-}
-
 function resolveContentCompanyId(context) {
-  const sourceName = normalizeCompanyKey(context && context.host_company_name);
-  if (sourceName === 'bıkmaz grup' || sourceName === 'bikmaz grup' || sourceName === 'bıkmaz' || sourceName === 'bikmaz') {
-    return findCachedCompanyIdByName('SmartICT') || 5;
-  }
   return getHostMediaCompanyId(context);
 }
 
@@ -385,11 +366,6 @@ function buildNormalMediaQueue() {
     .filter((item) => item.type === 'video');
   const generalItems = healthyItems.filter((item) => !item.company_id);
   if (generalItems.length) return generalItems;
-
-  const defaultCompanyItems = defaultCompanyId
-    ? healthyItems.filter((item) => Number(item.company_id) === Number(defaultCompanyId))
-    : [];
-  if (defaultCompanyItems.length) return defaultCompanyItems;
 
   return healthyItems;
 }
