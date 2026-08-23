@@ -1,0 +1,2 @@
+Description: Digital Visitor Management and Lobby Screen System built with Node.js, Express, and Prisma.
+Topics: nodejs, express, prisma, postgresql, websocket, visitor-management, turkish, javascript
